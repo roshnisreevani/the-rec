@@ -1,50 +1,51 @@
-# Welcome to your Expo app 👋
+# The Rec
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A social app for your athletic journey — not your athletic performance.
 
-## Get started
+Built for the casual athlete, not the elite one. Pickup basketball, a new pickleball habit, an office softball league, a friend's first time on a surfboard — moments worth posting, not just PRs. Funny first, impressive second: a self-deprecating highlight is celebrated just as much as a real one. Built around real friend groups and shared history, not strangers, followers, or influencer culture.
 
-1. Install dependencies
+## The gap
 
-   ```bash
-   npm install
-   ```
+- **Performance trackers** (Strava, Garmin, Motion) — built around GPS data, splits, and PRs; great for endurance training, intimidating and irrelevant for someone playing two-hand-touch with friends.
+- **Serious athlete networks** (PlayersOnly, Sporty, Front Pack) — built around skill level, recruiting, and matchmaking for people who already identify as athletes; earnest in tone, not friend-group-first.
+- **General social media** (Instagram, TikTok) — sports content gets buried in an everything-feed, with no structure for tracking who's won the most pickup games this year.
 
-2. Start the app
+The Rec is a casual, funny, friend-group-centered space that celebrates showing up and trying something new — not just elite performance.
 
-   ```bash
-   npx expo start
-   ```
+## Who it's for
 
-In the output, you'll find options to open the app in a
+- **Casual athletes (18–35)** — play pickup or rec-league sports for fun, not a PR; already post this stuff to Stories or a group chat and just need a permanent, organized home for it.
+- **Friend groups / squads** — a regular crew (a Sunday basketball run, an office softball team) that wants a shared record of who's won, inside jokes, and a place to talk trash outside a buried group chat.
+- **Hobby starters** — just picked up something new (climbing, pickleball, run club) and want to document the journey from complete beginner to "kind of good now," streak-style, where small wins matter more than stats.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## App structure
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Four tabs: **Profile** (identity, trophy case), **Groups** (create/join, chat, RSVP), **Feed** (posts + search), **Banter** (dedicated trash-talk threads).
 
-## Get a fresh project
+## Current features (Profile tab)
 
-When you're ready, run:
+- Email/password auth via Supabase
+- Editable profile: name, location, bio ("my legend"), sport tags
+- Searchable, multi-select sport tags (135+ activities)
+- Real profile photo upload
+- Walk-up song — search and 30-second preview playback via the iTunes Search API
+- "Pick your 3" — user-uploaded photos with custom captions
+- Freeform trophy case — self-awarded badges with custom emoji, title, and subtitle
+- "Roast me" — generates a random funny bio starter
+- Comic-style visual identity — ink outlines, hand-lettered headers, sticker-style badges
 
-```bash
-npm run reset-project
-```
+## Planned
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+- **Groups** — create/join, real-time group chat, RSVP polls ("who's in"), rivalry tracking
+- **Feed** — posts, photo/video, sport-specific reactions, search
+- **Banter** — dedicated trash-talk threads per group, separate from post comments
+- **Rec Check** — dual front/back camera capture with a countdown, for candid game-day moments
+- Auto-generated recap cards (joke stats: MVP of Vibes, Most Air Balls)
+- Animated splash intro
 
-## Learn more
+## Tech stack
 
-To learn more about developing your project with Expo, look at the following resources:
+- [Expo](https://expo.dev) (React Native), SDK 54, Expo Router
+- [Supabase](https://supabase.com) — auth, Postgres database, Storage
+- iTunes Search API for walk-up song search/preview
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
