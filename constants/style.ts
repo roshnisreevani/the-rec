@@ -9,7 +9,10 @@ export type ThemeColors = {
   textSecondary: string; // secondary/quiet text
   border: string; // hairline borders, dividers
   borderSoft: string; // even quieter dividers (e.g. row separators)
-  coral: string; // the one accent color — buttons, active states, highlights
+  coral: string; // primary accent ("red") — buttons, active states, highlights,
+  // high-energy elements like the 🔥 reaction and "HOT" badges
+  blue: string; // secondary accent — informational/connection elements: links,
+  // comment counts, the "no way" reaction, anything connections-related
   danger: string; // destructive actions
 };
 
@@ -20,6 +23,7 @@ export const LIGHT_COLORS: ThemeColors = {
   border: '#DEDCD6',
   borderSoft: '#EEEDEA',
   coral: '#FF5A36',
+  blue: '#3D5AFE',
   danger: '#D92626',
 };
 
@@ -30,6 +34,7 @@ export const DARK_COLORS: ThemeColors = {
   border: '#2A2A2A',
   borderSoft: '#3A3A3A',
   coral: '#FF5A36',
+  blue: '#3D5AFE',
   danger: '#FF6B5E',
 };
 
@@ -54,3 +59,8 @@ export const HAIRLINE = 1;
 // always be this fixed white — not the theme's `background`, which flips
 // to black in dark mode and would otherwise land black-on-coral there.
 export const ON_ACCENT = '#FFFFFF';
+
+// Fixed gold used for "legendary"/standout highlights (the Trophy Case's
+// legendary slot, Feed's Post of the Week badge). Theme-independent
+// for the same reason as ON_ACCENT above.
+export const GOLD = '#D4AF37';

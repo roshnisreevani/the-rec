@@ -27,6 +27,7 @@ function RootNavigator() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
             <Stack.Screen name="edit-profile" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="create-post" options={{ headerShown: false, presentation: 'modal' }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
           </Stack.Protected>
           <Stack.Protected guard={!session}>

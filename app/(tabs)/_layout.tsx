@@ -1,11 +1,13 @@
+import { useRouter } from 'expo-router';
 import { Tabs } from 'expo-router';
-import { MessageSquare, Images, User, Users } from 'lucide-react-native';
+import { CirclePlus, Images, MessageSquare, User, Users } from 'lucide-react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { useThemeColors } from '@/contexts/theme-context';
 
 export default function TabLayout() {
   const colors = useThemeColors();
+  const router = useRouter();
 
   return (
     <Tabs
@@ -32,6 +34,21 @@ export default function TabLayout() {
         options={{
           title: 'Groups',
           tabBarIcon: ({ color }) => <Users size={24} color={color} strokeWidth={1.75} />,
+        }}
+      />
+      <Tabs.Screen
+        name="create-post-tab"
+        options={{
+          title: '',
+          tabBarIcon: ({ color }) => <CirclePlus size={28} color={color} strokeWidth={1.75} />,
+        }}
+        listeners={{
+          // The "+" tab never actually navigates to a tab screen — it opens
+          // the create-post modal on top of whatever tab you're already on.
+          tabPress: (e) => {
+            e.preventDefault();
+            router.push('/create-post');
+          },
         }}
       />
       <Tabs.Screen

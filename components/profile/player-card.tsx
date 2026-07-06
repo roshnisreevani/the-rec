@@ -36,17 +36,25 @@ export const PlayerCard = forwardRef<ViewShot, Props>(function PlayerCard({ name
             react-native-qrcode-styled doesn't support these props it simply
             ignores them and falls back to standard square corners, so this
             never breaks scannability.
+
+            `errorCorrectionLevel` is cast via `as any` below because the
+            `qrcode` package (react-native-qrcode-styled's dependency) ships
+            no type declarations and this project has no @types/qrcode
+            installed, so the re-exported QRCodeOptions type resolves
+            incompletely and TS doesn't see this (very real, documented) prop.
           */}
           <QRCodeStyled
-            data={profileUrl}
-            pieceSize={7}
-            padding={16}
-            color={colors.text}
-            pieceCornerType="rounded"
-            pieceBorderRadius={3}
-            outerEyesOptions={{ borderRadius: 12, color: colors.coral }}
-            innerEyesOptions={{ borderRadius: 6, color: colors.coral }}
-            errorCorrectionLevel="H"
+            {...({
+              data: profileUrl,
+              size: 200,
+              padding: 16,
+              color: colors.text,
+              pieceCornerType: 'rounded',
+              pieceBorderRadius: 3,
+              outerEyesOptions: { borderRadius: 12, color: colors.coral },
+              innerEyesOptions: { borderRadius: 6, color: colors.coral },
+              errorCorrectionLevel: 'H',
+            } as any)}
           />
           {/*
             Centered logo drawn as a manual overlay rather than the library's
