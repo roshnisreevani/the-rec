@@ -169,6 +169,20 @@ export default function SettingsScreen() {
                 />
               }
             />
+            <Row
+              label="Private account"
+              sublabel="Only connections can see your bio, sport tags, trophy case, and Pick Your 3"
+              colors={colors}
+              styles={styles}
+              right={
+                <Switch
+                  value={settings.isPrivate}
+                  onValueChange={() => toggle('isPrivate', 'is_private')}
+                  trackColor={{ true: colors.coral, false: colors.border }}
+                  thumbColor={ON_ACCENT}
+                />
+              }
+            />
           </Section>
 
           <Section title="Safety" colors={colors} styles={styles}>

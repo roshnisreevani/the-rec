@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, MoreHorizontal } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -17,8 +17,12 @@ import { useThemeColors } from '@/contexts/theme-context';
 import {
   acceptConnection,
   fetchAllowsConnectionRequests,
+  fetchConnectionNote,
   fetchConnectionState,
+  fetchIsPrivate,
+  fetchMutualConnectionsCount,
   removeConnection,
+  saveConnectionNote,
   sendConnectionRequest,
   type ConnectionState,
 } from '@/lib/connections';
@@ -33,7 +37,7 @@ const PROFILE_REPORT_REASONS: ReportReasonOption[] = [
 ];
 
 export default function UserProfileScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, src } = useLocalSearchParams<{ id: string; src?: string }>();
   const { session } = useAuth();
   const currentUserId = session?.user.id;
   const router = useRouter();
@@ -49,6 +53,10 @@ export default function UserProfileScreen() {
     requestedByMe: false,
   });
   const [allowsRequests, setAllowsRequests] = useState(true);
+  const [isPrivate, setIsPrivate] = useState(true);
+  const [mutualCount, setMutualCount] = useState(0);
+  const [note, setNote] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -70,15 +78,34 @@ export default function UserProfileScreen() {
       }
       setBlocked(false);
 
-      const [fetchedProfile, state, allows] = await Promise.all([
+      const [fetchedProfile, state, allows, priv] = await Promise.all([
         fetchProfile(id),
         fetchConnectionState(currentUserId, id),
         fetchAllowsConnectionRequests(id),
+        fetchIsPrivate(id),
       ]);
 
       setProfile(fetchedProfile);
       setConnection(state);
       setAllowsRequests(allows);
+      setIsPrivate(priv);
+
+      // Mutual connections only matter as a pre-connection signal; skip once
+      // already connected (or self-requested), and fail soft either way.
+      if (state.status !== 'accepted') {
+        fetchMutualConnectionsCount(id).then(setMutualCount);
+      } else {
+        setMutualCount(0);
+      }
+
+      if (state.status === 'accepted') {
+        try {
+          const existingNote = await fetchConnectionNote(currentUserId, id);
+          setNote(existingNote.note);
+        } catch {
+          // Non-critical — the note field just stays blank if this fails.
+        }
+      }
     } catch (e) {
       Alert.alert('Could not load this profile', e instanceof Error ? e.message : 'Unknown error.');
     } finally {
@@ -91,6 +118,18 @@ export default function UserProfileScreen() {
       load();
     }, [load])
   );
+
+  const handleSaveNote = async () => {
+    if (!currentUserId || !id) return;
+    setNoteSaving(true);
+    try {
+      await saveConnectionNote(currentUserId, id, note);
+    } catch (e) {
+      Alert.alert('Could not save note', e instanceof Error ? e.message : 'Unknown error.');
+    } finally {
+      setNoteSaving(false);
+    }
+  };
 
   const handleConnect = async () => {
     if (!currentUserId || !id) return;
@@ -224,6 +263,10 @@ export default function UserProfileScreen() {
 
   if (!profile) return null;
 
+  const canSeeFullProfile = !isPrivate || connection.status === 'accepted';
+  const notYetConnected = connection.status !== 'accepted';
+  const cameFromQr = src === 'qr' && notYetConnected;
+
   return (
     <SafeAreaView style={styles.flex} edges={['top']}>
       <View style={styles.header}>
@@ -243,13 +286,33 @@ export default function UserProfileScreen() {
           <ProfileAvatar name={profile.name} photoUri={profile.avatarUrl} size={84} />
         </View>
 
-        <Text style={styles.location}>{profile.location || 'Location unknown (probably local)'}</Text>
+        {cameFromQr ? (
+          <View style={styles.qrBanner}>
+            <Text style={styles.qrBannerText}>
+              You scanned {profile.name || "this person's"} code — connect with them?
+            </Text>
+          </View>
+        ) : null}
 
-        <Text style={[styles.bio, !profile.legend && styles.placeholderText]}>
-          {profile.legend || "hasn't written a legend yet"}
-        </Text>
+        {notYetConnected && mutualCount > 0 ? (
+          <Text style={styles.mutualText}>
+            {mutualCount} mutual connection{mutualCount === 1 ? '' : 's'}
+          </Text>
+        ) : null}
 
-        <SportTagsField editing={false} selected={profile.sportTags} />
+        {canSeeFullProfile ? (
+          <>
+            <Text style={styles.location}>{profile.location || 'Location unknown (probably local)'}</Text>
+
+            <Text style={[styles.bio, !profile.legend && styles.placeholderText]}>
+              {profile.legend || "hasn't written a legend yet"}
+            </Text>
+
+            <SportTagsField editing={false} selected={profile.sportTags} />
+          </>
+        ) : (
+          <Text style={styles.privateText}>Connect to see more</Text>
+        )}
 
         <View style={styles.actionRow}>
           {connection.status === 'accepted' ? (
@@ -280,15 +343,35 @@ export default function UserProfileScreen() {
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Trophy Case</Text>
-          <TrophyCase editing={false} trophies={profile.trophies} />
-        </View>
+        {canSeeFullProfile ? (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Trophy Case</Text>
+              <TrophyCase editing={false} trophies={profile.trophies} />
+            </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pick Your 3</Text>
-          <PickThreeField editing={false} items={profile.pickThree} />
-        </View>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Pick Your 3</Text>
+              <PickThreeField editing={false} items={profile.pickThree} />
+            </View>
+          </>
+        ) : null}
+
+        {connection.status === 'accepted' ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Private note (only visible to you)</Text>
+            <TextInput
+              style={styles.noteInput}
+              placeholder="e.g. guards me every game"
+              placeholderTextColor={colors.textSecondary}
+              value={note}
+              onChangeText={setNote}
+              onBlur={handleSaveNote}
+              multiline
+            />
+            {noteSaving ? <ActivityIndicator color={colors.textSecondary} size="small" /> : null}
+          </View>
+        ) : null}
       </ScrollView>
 
       <ContentMenu
@@ -324,9 +407,35 @@ function makeStyles(colors: ThemeColors) {
     unavailableText: { fontSize: 15, color: colors.textSecondary, textAlign: 'center' },
     content: { padding: 20, paddingBottom: 48, gap: 4 },
     avatarSection: { alignItems: 'center' },
+    qrBanner: {
+      marginTop: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: RADII.md,
+      backgroundColor: colors.borderSoft,
+    },
+    qrBannerText: { fontSize: 13, fontWeight: WEIGHT.medium, color: colors.text, textAlign: 'center' },
+    mutualText: { marginTop: 10, fontSize: 13, color: colors.blue, textAlign: 'center', fontWeight: WEIGHT.medium },
+    privateText: {
+      marginTop: 14,
+      fontSize: 14,
+      fontStyle: 'italic',
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
     location: { marginTop: 14, fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
     bio: { marginTop: 8, fontSize: 15, fontStyle: 'italic', color: colors.text, textAlign: 'center' },
     placeholderText: { color: colors.textSecondary },
+    noteInput: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: RADII.md,
+      padding: 12,
+      fontSize: 14,
+      color: colors.text,
+      minHeight: 60,
+      textAlignVertical: 'top',
+    },
     actionRow: { marginTop: 18, alignItems: 'center' },
     incomingRow: { flexDirection: 'row', gap: 10, width: '100%' },
     primaryButton: {
