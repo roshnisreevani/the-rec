@@ -11,7 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { ContentMenu } from '@/components/feed/content-menu';
+import { ContentMenu } from '@/components/moderation/content-menu';
 import { FlyingReaction } from '@/components/feed/flying-reaction';
 import { ReactionBar } from '@/components/feed/reaction-bar';
 import { InitialsAvatar } from '@/components/profile/initials-avatar';

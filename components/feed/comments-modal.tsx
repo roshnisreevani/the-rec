@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 
-import { ContentMenu } from '@/components/feed/content-menu';
+import { ContentMenu } from '@/components/moderation/content-menu';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useThemeColors } from '@/contexts/theme-context';

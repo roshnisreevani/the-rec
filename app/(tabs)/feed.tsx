@@ -1,4 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
@@ -17,6 +18,7 @@ import { HOT_THRESHOLD, type ReactionType } from '@/lib/reactions';
 export default function FeedScreen() {
   const { session } = useAuth();
   const userId = session?.user.id;
+  const router = useRouter();
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -159,13 +161,7 @@ export default function FeedScreen() {
     <SafeAreaView style={styles.flex} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Feed</Text>
-        <AnimatedPressable
-          hitSlop={8}
-          onPress={() =>
-            // Search (people/groups) isn't built yet — placeholder stub until
-            // Connections ships.
-            Alert.alert('Search', 'Finding people and groups is coming soon.')
-          }>
+        <AnimatedPressable hitSlop={8} onPress={() => router.push('/find-people')}>
           <Search size={22} color={colors.text} strokeWidth={1.75} />
         </AnimatedPressable>
       </View>

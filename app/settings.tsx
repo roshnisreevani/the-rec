@@ -157,6 +157,29 @@ export default function SettingsScreen() {
                 />
               }
             />
+            <Row
+              label="Allow connection requests from anyone"
+              sublabel="Turn off to stop new people from requesting to connect"
+              colors={colors}
+              styles={styles}
+              right={
+                <Switch
+                  value={settings.allowConnectionRequests}
+                  onValueChange={() => toggle('allowConnectionRequests', 'allow_connection_requests')}
+                  trackColor={{ true: colors.coral, false: colors.border }}
+                  thumbColor={ON_ACCENT}
+                />
+              }
+            />
+          </Section>
+
+          <Section title="Safety" colors={colors} styles={styles}>
+            <LinkRow
+              label="Privacy & Safety"
+              onPress={() => router.push('/privacy-safety')}
+              colors={colors}
+              styles={styles}
+            />
           </Section>
 
           <Section title="About" colors={colors} styles={styles}>
