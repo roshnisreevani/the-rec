@@ -28,6 +28,10 @@ function RootNavigator() {
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
             <Stack.Screen name="edit-profile" options={{ headerShown: false, presentation: 'modal' }} />
             <Stack.Screen name="create-post" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="create-group" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="group/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="group/invite/[id]" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="join/[code]" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
           </Stack.Protected>
           <Stack.Protected guard={!session}>
