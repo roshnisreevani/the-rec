@@ -1,12 +1,13 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Check, ChevronLeft, Lock, UserPlus, Users2, X } from 'lucide-react-native';
+import { Check, ChevronLeft, Lock, MessagesSquare, UserPlus, Users2, X } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InitialsAvatar } from '@/components/profile/initials-avatar';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import { fetchGroupConversationId } from '@/lib/banter';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
@@ -160,10 +161,31 @@ export default function GroupDetailScreen() {
 
         {group.description ? <Text style={styles.description}>{group.description}</Text> : null}
 
-        <AnimatedPressable style={styles.inviteButton} onPress={() => router.push(`/group/invite/${group.id}`)}>
-          <UserPlus size={16} color={ON_ACCENT} strokeWidth={2} />
-          <Text style={styles.inviteButtonText}>Invite</Text>
-        </AnimatedPressable>
+        <View style={styles.actionRow}>
+          <AnimatedPressable
+            style={[styles.inviteButton, styles.actionButton]}
+            onPress={() => router.push(`/group/invite/${group.id}`)}>
+            <UserPlus size={16} color={ON_ACCENT} strokeWidth={2} />
+            <Text style={styles.inviteButtonText}>Invite</Text>
+          </AnimatedPressable>
+          <AnimatedPressable
+            style={[styles.banterButton, styles.actionButton]}
+            onPress={async () => {
+              try {
+                const conversationId = await fetchGroupConversationId(group.id);
+                if (!conversationId) {
+                  Alert.alert('No Banter thread yet', 'Pull to refresh and try again in a moment.');
+                  return;
+                }
+                router.push(`/chat/${conversationId}`);
+              } catch (e) {
+                Alert.alert('Could not open Banter', e instanceof Error ? e.message : 'Unknown error.');
+              }
+            }}>
+            <MessagesSquare size={16} color={colors.text} strokeWidth={2} />
+            <Text style={styles.banterButtonText}>Banter</Text>
+          </AnimatedPressable>
+        </View>
 
         {joinRequests.length > 0 ? (
           <View style={styles.section}>
@@ -263,6 +285,8 @@ function makeStyles(colors: ThemeColors) {
     metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     metaText: { fontSize: 12, color: colors.textSecondary },
     description: { fontSize: 14, color: colors.text, marginTop: 12, lineHeight: 20 },
+    actionRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
+    actionButton: { flex: 1 },
     inviteButton: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -271,9 +295,19 @@ function makeStyles(colors: ThemeColors) {
       backgroundColor: colors.coral,
       borderRadius: RADII.md,
       paddingVertical: 12,
-      marginTop: 18,
     },
     inviteButtonText: { color: ON_ACCENT, fontWeight: WEIGHT.semibold, fontSize: 14 },
+    banterButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: RADII.md,
+      paddingVertical: 12,
+    },
+    banterButtonText: { color: colors.text, fontWeight: WEIGHT.semibold, fontSize: 14 },
     section: { marginTop: 26, gap: 4 },
     sectionTitle: { fontSize: 13, fontWeight: WEIGHT.bold, color: colors.text, marginBottom: 8 },
     memberRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
