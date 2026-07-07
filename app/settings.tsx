@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -11,8 +11,6 @@ import { useTheme, useThemeColors } from '@/contexts/theme-context';
 import { deleteAccount } from '@/lib/account';
 import { fetchSettings, updateSetting, type UserSettings } from '@/lib/settings';
 
-const PRIVACY_POLICY_URL = 'https://example.com/the-rec/privacy';
-const TERMS_URL = 'https://example.com/the-rec/terms';
 
 export default function SettingsScreen() {
   const { session, signOut } = useAuth();
@@ -160,8 +158,8 @@ export default function SettingsScreen() {
           </Section>
 
           <Section title="About" colors={colors} styles={styles}>
-            <LinkRow label="Privacy Policy" onPress={() => Linking.openURL(PRIVACY_POLICY_URL)} colors={colors} styles={styles} />
-            <LinkRow label="Terms of Service" onPress={() => Linking.openURL(TERMS_URL)} colors={colors} styles={styles} />
+            <LinkRow label="Privacy Policy" onPress={() => router.push('/privacy-policy')} colors={colors} styles={styles} />
+            <LinkRow label="Terms of Service" onPress={() => router.push('/terms-of-service')} colors={colors} styles={styles} />
           </Section>
 
           <Section title="Account" colors={colors} styles={styles}>

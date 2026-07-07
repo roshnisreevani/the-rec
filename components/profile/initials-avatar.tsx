@@ -15,6 +15,8 @@ type Props = {
   size?: number;
 };
 
+const SQUARE_RADIUS_RATIO = 0.22;
+
 export function InitialsAvatar({ name, size = 76 }: Props) {
   const colors = useThemeColors();
   const initials = initialsForName(name);
@@ -22,8 +24,8 @@ export function InitialsAvatar({ name, size = 76 }: Props) {
   return (
     <View
       style={[
-        styles.circle,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.text },
+        styles.square,
+        { width: size, height: size, borderRadius: size * SQUARE_RADIUS_RATIO, backgroundColor: colors.text },
       ]}>
       <Text style={[styles.text, { fontSize: size * 0.34, color: colors.background }]}>{initials}</Text>
     </View>
@@ -31,6 +33,6 @@ export function InitialsAvatar({ name, size = 76 }: Props) {
 }
 
 const styles = StyleSheet.create({
-  circle: { alignItems: 'center', justifyContent: 'center' },
+  square: { alignItems: 'center', justifyContent: 'center' },
   text: { fontWeight: WEIGHT.bold },
 });

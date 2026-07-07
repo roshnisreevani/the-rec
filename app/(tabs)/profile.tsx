@@ -6,6 +6,9 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PickThreeField } from '@/components/profile/pick-three-field';
+import { GroupsBadge } from '@/components/profile/groups-badge';
+import { PennieBadge } from '@/components/profile/pennie-badge';
+import { SportsBadge } from '@/components/profile/sports-badge';
 import { ProfileAvatar } from '@/components/profile/profile-avatar';
 import { QrShareModal } from '@/components/profile/qr-share-modal';
 import { SportTagsField } from '@/components/profile/sport-tags-field';
@@ -15,7 +18,7 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
-import { MOCK_GAMES_COUNT, MOCK_GROUPS_COUNT, MOCK_STREAK_WEEKS } from '@/lib/mock-stats';
+import { MOCK_GAMES_COUNT, MOCK_GROUPS_COUNT, MOCK_STREAK_WEEKS, MOCK_PENNIES_COUNT } from '@/lib/mock-stats';
 import { emptyProfile, fetchProfile, saveProfile, type Profile, type Trophy } from '@/lib/profile';
 
 function generateId(): string {
@@ -151,9 +154,9 @@ export default function ProfileScreen() {
         <View style={styles.avatarSection}>
           <ProfileAvatar name={profile.name} photoUri={profile.avatarUrl} size={84} />
           <View style={styles.statRow}>
-            <Stat value={profile.trophies.length} label="trophies" styles={styles} />
-            <Stat value={MOCK_GROUPS_COUNT} label="groups" styles={styles} />
-            <Stat value={MOCK_GAMES_COUNT} label="games" styles={styles} />
+            <PennieBadge count={MOCK_PENNIES_COUNT} />
+            <GroupsBadge count={MOCK_GROUPS_COUNT} />
+            <SportsBadge count={MOCK_GAMES_COUNT} />
           </View>
         </View>
 
@@ -174,17 +177,6 @@ export default function ProfileScreen() {
             <Text style={styles.primaryButtonText}>Share</Text>
           </AnimatedPressable>
         </View>
-
-        {/* Trophy case */}
-        <Section title="Trophy Case" styles={styles}>
-          <TrophyCase
-            editing
-            trophies={profile.trophies}
-            onAdd={handleAddTrophy}
-            onUpdate={handleUpdateTrophy}
-            onRemove={handleRemoveTrophy}
-          />
-        </Section>
 
         {/* Pick Your 3 — now the sole primary section here since walk-up song moved up top */}
         <Section title="Pick Your 3" styles={styles}>
