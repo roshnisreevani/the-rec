@@ -1,6 +1,6 @@
 export const PRIVACY_POLICY_TEXT = `**Last updated: 07/06/2026**
 
-This Privacy Policy explains how Pinnied ("we," "us," "our," or "the App") collects, uses, and protects your information. Group 4 operates Pinnied. If you have questions, contact us at info@pinnied.com.
+This Privacy Policy explains how Pinnied ("we," "us," "our," or "the App") collects, uses, and protects your information. Group 4 operates Pinnied. If you have questions, contact us at info.pennied@gmail.com.
 
 ## 1. Information we collect
 
@@ -42,7 +42,7 @@ You may permanently delete your account at any time from Settings. Deleting your
 
 ## 6. Children's privacy
 
-Pinnied is not directed at children under 13 (or the relevant minimum age in your country), and we do not knowingly collect information from children under that age. If you believe a child has created an account, contact us at info@pinnied.com and we will remove it.
+Pinnied is not directed at children under 13 (or the relevant minimum age in your country), and we do not knowingly collect information from children under that age. If you believe a child has created an account, contact us at info.pennied@gmail.com and we will remove it.
 
 ## 7. Security
 
@@ -54,7 +54,7 @@ We may update this Privacy Policy as the app evolves. We'll update the "Last upd
 
 ## 9. Contact us
 
-Questions about this policy? Reach us at info@pinnied.com.`;
+Questions about this policy? Reach us at info.pennied@gmail.com.`;
 
 export const TERMS_OF_SERVICE_TEXT = `**Last updated: 07/06/2026**
 
@@ -66,7 +66,7 @@ You must be at least 13 years old to use Pinnied. By using the app, you confirm 
 
 ## 2. Your account
 
-You're responsible for keeping your login credentials secure and for all activity under your account. Let us know at info@pinnied.com if you believe your account has been accessed without your permission.
+You're responsible for keeping your login credentials secure and for all activity under your account. Let us know at info.pennied@gmail.com if you believe your account has been accessed without your permission.
 
 ## 3. Your content
 
@@ -108,4 +108,4 @@ These Terms are governed by the laws of Illinois, USA, without regard to conflic
 
 ## 11. Contact us
 
-Questions about these Terms? Reach us at info@pinnied.com.`;
+Questions about these Terms? Reach us at info.pennied@gmail.com.`;
