@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Bell, Flame, Settings } from 'lucide-react-native';
+import { Bell, Flame, Settings, UserPlus } from 'lucide-react-native';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +18,9 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
+import { fetchReceivedRequestsCount } from '@/lib/connections';
 import { MOCK_GAMES_COUNT, MOCK_GROUPS_COUNT, MOCK_STREAK_WEEKS, MOCK_PENNIES_COUNT } from '@/lib/mock-stats';
+import { fetchUnreadNotificationCount } from '@/lib/notifications';
 import { emptyProfile, fetchProfile, saveProfile, type Profile, type Trophy } from '@/lib/profile';
 
 function generateId(): string {
@@ -35,6 +37,8 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -46,6 +50,19 @@ export default function ProfileScreen() {
       setProfile(emptyProfile(userId));
     } finally {
       setLoading(false);
+    }
+
+    // Both of these drive small badges on the top-row icons — non-fatal:
+    // the badges just stay at their last known value if either fails.
+    try {
+      setPendingRequestsCount(await fetchReceivedRequestsCount(userId));
+    } catch {
+      // Non-critical.
+    }
+    try {
+      setUnreadNotificationsCount(await fetchUnreadNotificationCount(userId));
+    } catch {
+      // Non-critical.
     }
   }, [userId]);
 
@@ -126,8 +143,17 @@ export default function ProfileScreen() {
             {profile.name || 'Nameless legend'}
           </Text>
           <View style={styles.topIcons}>
-            <AnimatedPressable hitSlop={8} onPress={() => Alert.alert('Notifications', 'Nothing new yet.')}>
+            <AnimatedPressable hitSlop={8} onPress={() => router.push('/requests')} style={styles.iconWrap}>
+              <UserPlus size={22} color={colors.text} strokeWidth={1.75} />
+              {pendingRequestsCount > 0 ? (
+                <IconBadge count={pendingRequestsCount} color={colors.blue} styles={styles} />
+              ) : null}
+            </AnimatedPressable>
+            <AnimatedPressable hitSlop={8} onPress={() => router.push('/notifications')} style={styles.iconWrap}>
               <Bell size={22} color={colors.text} strokeWidth={1.75} />
+              {unreadNotificationsCount > 0 ? (
+                <IconBadge count={unreadNotificationsCount} color={colors.coral} styles={styles} />
+              ) : null}
             </AnimatedPressable>
             <AnimatedPressable hitSlop={8} onPress={() => router.push('/settings')}>
               <Settings size={22} color={colors.text} strokeWidth={1.75} />
@@ -196,6 +222,18 @@ export default function ProfileScreen() {
   );
 }
 
+// Small count badge for the top-row icons — deliberately given a distinct
+// color per icon (blue for Connections/requests, coral for Notifications)
+// so a pending connection request and unread post activity never look like
+// the same kind of thing at a glance.
+function IconBadge({ count, color, styles }: { count: number; color: string; styles: ReturnType<typeof makeStyles> }) {
+  return (
+    <View style={[styles.iconBadge, { backgroundColor: color }]}>
+      <Text style={styles.iconBadgeText}>{count > 9 ? '9+' : count}</Text>
+    </View>
+  );
+}
+
 function Stat({ value, label, styles }: { value: number; label: string; styles: ReturnType<typeof makeStyles> }) {
   return (
     <View style={styles.stat}>
@@ -227,6 +265,21 @@ function makeStyles(colors: ThemeColors) {
     flex: { flex: 1, backgroundColor: colors.background },
     loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
     content: { padding: 20, paddingBottom: 48, gap: 4 },
+    iconWrap: { position: 'relative' },
+    iconBadge: {
+      position: 'absolute',
+      top: -4,
+      right: -6,
+      minWidth: 15,
+      height: 15,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 3,
+      borderWidth: 1.5,
+      borderColor: colors.background,
+    },
+    iconBadgeText: { fontSize: 9, fontWeight: WEIGHT.bold, color: ON_ACCENT },
     topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     topName: { fontSize: 20, fontWeight: WEIGHT.bold, color: colors.text, flex: 1 },
     topIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 },

@@ -147,6 +147,21 @@ export async function fetchSentRequests(userId: string): Promise<ConnectionReque
 }
 
 /**
+ * Lightweight count (no profile joins) of pending requests the current user
+ * has received — just for the small badge on Profile's Connections icon.
+ */
+export async function fetchReceivedRequestsCount(userId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('connections')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'pending')
+    .neq('requested_by', userId);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
  * Count of accepted connections for the profile stat row. No explicit
  * user_a/user_b filter needed — RLS already restricts rows to ones the
  * current user is part of.
