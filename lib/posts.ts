@@ -12,7 +12,7 @@ export type Post = {
   authorId: string;
   authorName: string;
   authorAvatarUrl: string | null;
-  groupId: string;
+  groupId: string | null;
   sportTag: string | null;
   groupName: string;
   groupEmoji: string;
@@ -40,7 +40,7 @@ type CommentCountRow = { count: number };
 type PostRow = {
   id: string;
   author_id: string;
-  group_id: string;
+  group_id: string | null;
   sport_tag: string | null;
   caption: string | null;
   media_url: string;
@@ -73,7 +73,7 @@ function rowToPost(row: PostRow, currentUserId: string | undefined): Post {
     }
   }
 
-  const group = getMockGroup(row.group_id);
+  const group = row.group_id ? getMockGroup(row.group_id) : null;
 
   return {
     id: row.id,
@@ -82,7 +82,7 @@ function rowToPost(row: PostRow, currentUserId: string | undefined): Post {
     authorAvatarUrl: row.author?.avatar_url ?? null,
     groupId: row.group_id,
     sportTag: row.sport_tag,
-    groupName: group?.name ?? row.group_id,
+    groupName: group?.name ?? 'General',
     groupEmoji: group?.emoji ?? '🏟️',
     caption: row.caption ?? '',
     mediaUrl: row.media_url,
@@ -169,7 +169,7 @@ async function uploadFeedMedia(userId: string, localUri: string, mediaType: Medi
 
 export async function createPost(input: {
   authorId: string;
-  groupId: string;
+  groupId?: string | null;
   sportTag: string | null;
   caption: string;
   localMediaUri: string;
@@ -179,7 +179,7 @@ export async function createPost(input: {
 
   const { error } = await supabase.from('posts').insert({
     author_id: input.authorId,
-    group_id: input.groupId,
+    group_id: input.groupId ?? null,
     sport_tag: input.sportTag,
     caption: input.caption,
     media_url: mediaUrl,

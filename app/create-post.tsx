@@ -11,7 +11,6 @@ import { SportPickerField } from '@/components/create-post/sport-picker-field';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
-import { MOCK_GROUPS } from '@/lib/groups-mock';
 import { type SportTag } from '@/lib/sports';
 import { createPost, type MediaType } from '@/lib/posts';
 
@@ -110,7 +109,6 @@ export default function CreatePostScreen() {
 
   const [media, setMedia] = useState<{ uri: string; type: MediaType } | null>(null);
   const [caption, setCaption] = useState('');
-  const [groupId, setGroupId] = useState(MOCK_GROUPS[0]?.id ?? '');
   const [posting, setPosting] = useState(false);
   const [sportTag, setSportTag] = useState<SportTag | null>(null);
 
@@ -139,7 +137,6 @@ export default function CreatePostScreen() {
     try {
       await createPost({
         authorId: userId,
-        groupId,
         sportTag,
         caption: caption.trim(),
         localMediaUri: media.uri,
