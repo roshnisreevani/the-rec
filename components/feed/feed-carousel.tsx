@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -85,6 +86,24 @@ export function FeedCarousel({
   const banterOpacity = useSharedValue(0);
 
   const activePost = posts[activeIndex];
+
+  // Preload the adjacent posts' photos so they're already decoded and in
+  // memory/disk cache by the time a swipe brings them into view — without
+  // this, swapping `activePost` to the next/prev post makes expo-image
+  // start a fresh fetch+decode right at swipe time, which is exactly the
+  // "beat of lag" this is fixing. Only ever the immediate neighbors, per
+  // spec — not the whole feed.
+  useEffect(() => {
+    const neighborUrls = [posts[activeIndex + 1]?.mediaUrl, posts[activeIndex - 1]?.mediaUrl].filter(
+      (uri): uri is string => !!uri
+    );
+    if (neighborUrls.length > 0) {
+      ExpoImage.prefetch(neighborUrls).catch(() => {
+        // Best-effort — a failed prefetch just means that neighbor loads
+        // normally (with its usual latency) when swiped to, not a crash.
+      });
+    }
+  }, [activeIndex, posts]);
 
   const finishTransition = (direction: 'left' | 'right') => {
     const newIndex = direction === 'left' ? activeIndex + 1 : activeIndex - 1;
@@ -197,7 +216,12 @@ export function FeedCarousel({
       <View style={styles.stage}>
         {nextPost ? (
           <View style={styles.peekWrap} pointerEvents="none">
-            <Image source={{ uri: nextPost.mediaUrl }} style={styles.peekImage} />
+            <ExpoImage
+              source={{ uri: nextPost.mediaUrl }}
+              style={styles.peekImage}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
           </View>
         ) : null}
 

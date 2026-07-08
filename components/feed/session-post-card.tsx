@@ -1,3 +1,4 @@
+import { Image as ExpoImage } from 'expo-image';
 import { MessageCircle, MoreHorizontal } from 'lucide-react-native';
 import { useMemo, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -93,7 +94,18 @@ export function SessionPostCard({
             <Text style={styles.videoFallbackText}>▶ video</Text>
           </View>
         ) : (
-          <Image source={{ uri: post.mediaUrl }} style={styles.media} />
+          // expo-image (not core RN Image) for its memory+disk caching —
+          // paired with the adjacent-post prefetch in feed-carousel.tsx,
+          // this is what makes the swiped-to photo already be decoded and
+          // ready instead of re-fetching on every swipe. contentFit="cover"
+          // is explicit (matches core Image's default too, but explicit
+          // here since stretching/tiling was one of the things to rule out).
+          <ExpoImage
+            source={{ uri: post.mediaUrl }}
+            style={styles.media}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
         )}
         <FlyingReaction triggerKey={flyKey} emoji="🔥" />
 
