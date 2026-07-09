@@ -3,7 +3,19 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { Video } from 'lucide-react-native';
 import { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -178,6 +190,10 @@ export default function CreatePostScreen() {
           flex: 1,
           transform: [{ translateX: shakeX }, { rotate: rotateDeg }, { scale }],
         }}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={0}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <AnimatedPressable style={styles.mediaBox} onPress={handlePickMedia}>
             {media ? (
@@ -206,6 +222,7 @@ export default function CreatePostScreen() {
           />
 
         </ScrollView>
+        </KeyboardAvoidingView>
       </Animated.View>
 
       {/* Full-screen flash pulse */}

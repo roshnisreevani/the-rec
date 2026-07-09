@@ -2,7 +2,7 @@ import { totalReactions, type Post } from '@/lib/posts';
 
 export type FeedSession = {
   key: string;
-  groupId: string;
+  groupId: string | null;
   groupName: string;
   groupEmoji: string;
   dateLabel: string;

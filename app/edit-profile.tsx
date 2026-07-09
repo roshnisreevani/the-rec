@@ -1,6 +1,16 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PickThreeField, type PickThreeSlot } from '@/components/profile/pick-three-field';
@@ -184,7 +194,11 @@ export default function EditProfileScreen() {
         </AnimatedPressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.avatarRow}>
           <ProfileAvatar name={name} photoUri={avatarUri} editable onPress={handlePickAvatar} size={84} />
         </View>
@@ -244,7 +258,8 @@ export default function EditProfileScreen() {
         <Section title="Pick your 3" styles={styles}>
           <PickThreeField editing slots={slots} onPickPhoto={handlePickPhoto} onCaptionChange={handleCaptionChange} />
         </Section>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

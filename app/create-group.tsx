@@ -1,6 +1,16 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProfileAvatar } from '@/components/profile/profile-avatar';
@@ -8,6 +18,7 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
+import { errorMessage } from '@/lib/error-message';
 import { createGroup, GROUP_TYPES, GROUP_TYPE_LABELS, type GroupPrivacy, type GroupType } from '@/lib/groups';
 import { pickPhoto } from '@/lib/pick-photo';
 import { uploadAvatarPhoto } from '@/lib/upload-photo';
@@ -56,7 +67,7 @@ export default function CreateGroupScreen() {
       });
       router.replace(`/group/${group.id}`);
     } catch (e) {
-      Alert.alert('Could not create group', e instanceof Error ? e.message : 'Unknown error.');
+      Alert.alert('Could not create group', errorMessage(e, 'Unknown error.'));
     } finally {
       setSaving(false);
     }
@@ -74,7 +85,11 @@ export default function CreateGroupScreen() {
         </AnimatedPressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.avatarRow}>
           <ProfileAvatar name={name} photoUri={avatarUri} editable onPress={handlePickAvatar} size={84} />
           <Text style={styles.avatarHint}>Add a group photo (optional)</Text>
@@ -141,7 +156,8 @@ export default function CreateGroupScreen() {
               : 'Anyone with an invite link can join instantly, no approval needed.'}
           </Text>
         </Section>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

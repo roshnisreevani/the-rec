@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -53,6 +53,26 @@ export function CommentsModal({
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
   const [menuComment, setMenuComment] = useState<Comment | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // KeyboardAvoidingView doesn't work reliably here: this UI lives inside a
+  // native <Modal presentationStyle="pageSheet">, and on iOS that combo has a
+  // well-known bug where KeyboardAvoidingView's internal keyboard-frame math
+  // (measured against the pageSheet's own offset screen position, not the
+  // full screen) comes out ~0, so its "padding" behavior does nothing. Track
+  // the keyboard height directly instead and push the composer up manually —
+  // this works the same regardless of the modal's presentation style.
+  useEffect(() => {
+    if (!visible) return;
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [visible]);
 
   const load = useCallback(async () => {
     if (!postId) return;
@@ -136,9 +156,7 @@ export function CommentsModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet">
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={[styles.flex, Platform.OS === 'ios' && { paddingBottom: keyboardHeight }]}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Comments</Text>
           <AnimatedPressable onPress={onClose} hitSlop={8}>
@@ -186,7 +204,7 @@ export function CommentsModal({
             {sending ? <ActivityIndicator color={ON_ACCENT} size="small" /> : <Text style={styles.sendButtonText}>Post</Text>}
           </AnimatedPressable>
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       {menuComment ? (
         <ContentMenu

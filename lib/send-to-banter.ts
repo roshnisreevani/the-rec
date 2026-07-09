@@ -47,6 +47,11 @@ export async function sendPostToPosterDm(post: Post, senderId: string): Promise<
  * this starts working end-to-end with no changes needed here.
  */
 export async function sendPostToBanter(post: Post, senderId: string): Promise<boolean> {
+  if (!post.groupId) {
+    // Post isn't attached to a group (groups are now optional on posts) —
+    // there's no group Banter thread to forward into.
+    return false;
+  }
   try {
     const conversationId = await fetchGroupConversationId(post.groupId);
     if (!conversationId) {
