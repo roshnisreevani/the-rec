@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -59,8 +60,13 @@ export default function AuthScreen() {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.container}>
         <View style={styles.brand}>
-          <Text style={styles.wordmark}>the rec</Text>
-          <Text style={styles.tagline}>never live down the airball.</Text>
+          <Image
+            source={require('@/assets/images/Pinnied_Logo_Final.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.wordmark}>Pinnied</Text>
+          <Text style={styles.tagline}>pin it or it didn't happen.</Text>
         </View>
 
         <View style={styles.form}>
@@ -114,6 +120,7 @@ function makeStyles(colors: ThemeColors) {
     flex: { flex: 1, backgroundColor: colors.background },
     container: { flex: 1, justifyContent: 'center', padding: 24 },
     brand: { alignItems: 'center', marginBottom: 40 },
+    logo: { width: 120, height: 120, marginBottom: 12, borderRadius: RADII.lg },
     wordmark: { fontSize: 34, fontWeight: WEIGHT.bold, color: colors.coral },
     tagline: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
     form: { gap: 12 },
