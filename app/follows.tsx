@@ -93,7 +93,7 @@ export default function FollowsScreen() {
             </Text>
           }
           renderItem={({ item }) => (
-            <View style={styles.row}>
+            <AnimatedPressable style={styles.row} onPress={() => router.push(`/user/${item.id}`)}>
               {item.avatarUrl ? (
                 <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
               ) : (
@@ -102,7 +102,7 @@ export default function FollowsScreen() {
               <Text style={styles.rowName} numberOfLines={1}>
                 {item.name}
               </Text>
-            </View>
+            </AnimatedPressable>
           )}
         />
       )}
