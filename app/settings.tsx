@@ -5,7 +5,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, View } 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
+import { FONTS, ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme, useThemeColors } from '@/contexts/theme-context';
 import { deleteAccount } from '@/lib/account';
@@ -279,7 +279,7 @@ function makeStyles(colors: ThemeColors) {
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
-    headerTitle: { fontSize: 16, fontWeight: WEIGHT.bold, color: colors.text },
+    headerTitle: { fontSize: 16, fontFamily: FONTS.displaySemibold, color: colors.text },
     content: { padding: 20, paddingBottom: 60, gap: 4 },
     section: { marginTop: 22, gap: 8 },
     sectionTitle: {
@@ -306,7 +306,7 @@ function makeStyles(colors: ThemeColors) {
       backgroundColor: colors.background,
     },
     rowText: { flex: 1, paddingRight: 12, gap: 2 },
-    rowLabel: { fontSize: 14, fontWeight: WEIGHT.medium, color: colors.text },
+    rowLabel: { fontSize: 14, fontFamily: FONTS.displayMedium, color: colors.text },
     rowSublabel: { fontSize: 12, color: colors.textSecondary },
     logoutRow: {
       paddingHorizontal: 14,
@@ -316,7 +316,7 @@ function makeStyles(colors: ThemeColors) {
       borderRadius: RADII.md,
       backgroundColor: colors.background,
     },
-    logoutText: { fontSize: 14, fontWeight: WEIGHT.semibold, color: colors.text },
+    logoutText: { fontSize: 14, fontFamily: FONTS.displaySemibold, color: colors.text },
     dangerZone: { marginTop: 34, gap: 8, paddingTop: 18, borderTopWidth: 1, borderTopColor: colors.border },
     dangerLabel: {
       fontSize: 12,
@@ -331,7 +331,7 @@ function makeStyles(colors: ThemeColors) {
       paddingVertical: 13,
       alignItems: 'center',
     },
-    deleteButtonText: { fontWeight: WEIGHT.bold, color: ON_ACCENT, fontSize: 14 },
+    deleteButtonText: { fontFamily: FONTS.displaySemibold, color: ON_ACCENT, fontSize: 14 },
     dangerHint: { fontSize: 12, color: colors.textSecondary },
   });
 }

@@ -13,7 +13,7 @@ import { SportTagsField } from '@/components/profile/sport-tags-field';
 import { TrophyCase } from '@/components/profile/trophy-case';
 import { WalkupSongRow } from '@/components/profile/walkup-song-row';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
+import { FONTS, ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { fetchFollowCounts } from '@/lib/follows';
@@ -343,7 +343,7 @@ function makeStyles(colors: ThemeColors) {
       borderColor: colors.border,
     },
     streakText: { fontSize: 12, fontWeight: WEIGHT.semibold, color: colors.text },
-    name: { fontSize: 22, fontWeight: WEIGHT.bold, color: colors.text, textAlign: 'center' },
+    name: { fontSize: 22, fontFamily: FONTS.display, color: colors.text, textAlign: 'center' },
     locationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
     // Light rounded container with thin dividers between the three stats.
     statRow: {
@@ -378,7 +378,7 @@ function makeStyles(colors: ThemeColors) {
       borderColor: colors.border,
       backgroundColor: colors.background,
     },
-    secondaryButtonText: { fontWeight: WEIGHT.semibold, fontSize: 14, color: colors.text },
+    secondaryButtonText: { fontFamily: FONTS.displaySemibold, fontSize: 14, color: colors.text },
     primaryButton: {
       flex: 1,
       alignItems: 'center',
@@ -386,8 +386,8 @@ function makeStyles(colors: ThemeColors) {
       borderRadius: RADII.md,
       backgroundColor: colors.coral,
     },
-    primaryButtonText: { fontWeight: WEIGHT.semibold, fontSize: 14, color: ON_ACCENT },
+    primaryButtonText: { fontFamily: FONTS.displaySemibold, fontSize: 14, color: ON_ACCENT },
     section: { marginTop: 26, gap: 10 },
-    sectionTitle: { fontSize: 13, fontWeight: WEIGHT.bold, color: colors.text },
+    sectionTitle: { fontSize: 13, fontFamily: FONTS.displaySemibold, color: colors.text },
   });
 }

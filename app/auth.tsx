@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
+import { FONTS, ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 
@@ -121,7 +121,7 @@ function makeStyles(colors: ThemeColors) {
     container: { flex: 1, justifyContent: 'center', padding: 24 },
     brand: { alignItems: 'center', marginBottom: 40 },
     logo: { width: 120, height: 120, marginBottom: 12, borderRadius: RADII.lg },
-    wordmark: { fontSize: 34, fontWeight: WEIGHT.bold, color: colors.coral },
+    wordmark: { fontSize: 34, fontFamily: FONTS.display, color: colors.coral },
     tagline: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
     form: { gap: 12 },
     input: {

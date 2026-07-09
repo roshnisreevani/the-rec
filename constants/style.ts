@@ -22,7 +22,7 @@ export const LIGHT_COLORS: ThemeColors = {
   textSecondary: '#8A8578',
   border: '#DEDCD6',
   borderSoft: '#EEEDEA',
-  coral: '#FF5A36',
+  coral: '#E31C24',
   blue: '#3D5AFE',
   danger: '#D92626',
 };
@@ -33,7 +33,7 @@ export const DARK_COLORS: ThemeColors = {
   textSecondary: '#8A8A8A',
   border: '#2A2A2A',
   borderSoft: '#3A3A3A',
-  coral: '#FF5A36',
+  coral: '#E31C24',
   blue: '#3D5AFE',
   danger: '#FF6B5E',
 };
@@ -72,3 +72,15 @@ export const GOLD = '#D4AF37';
 export const DARK_SURFACE = '#14141A';
 export const ON_DARK_SURFACE = '#FFFFFF';
 export const ON_DARK_SURFACE_SECONDARY = '#9A968C';
+
+// Custom brand fonts, loaded in app/_layout.tsx. FONTS.display is the main
+// headline font (Space Grotesk — geometric, distinct from the system font,
+// used for wordmarks/names/section titles). FONTS.marker is a bold
+// handwritten accent font used sparingly for playful moments.
+export const FONTS = {
+  display: 'SpaceGrotesk_700Bold',
+  displaySemibold: 'SpaceGrotesk_600SemiBold',
+  displayMedium: 'SpaceGrotesk_500Medium',
+  displayRegular: 'SpaceGrotesk_400Regular',
+  marker: 'PermanentMarker_400Regular',
+} as const;
