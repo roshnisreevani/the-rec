@@ -1,8 +1,18 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Bell, Flame, MapPin, Settings, Users } from 'lucide-react-native';
+import { Bell, Flame, MapPin, Settings, Users, X } from 'lucide-react-native';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CrestAvatar } from '@/components/profile/crest-avatar';
@@ -36,6 +46,7 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
+  const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [groupsCount, setGroupsCount] = useState(0);
@@ -165,7 +176,9 @@ export default function ProfileScreen() {
 
         {/* Centered header: crest photo → streak → name → bio → location */}
         <View style={styles.headerStack}>
-          <CrestAvatar name={profile.name} photoUri={profile.avatarUrl} size={155} />
+          <AnimatedPressable onPress={() => setAvatarViewerOpen(true)} hitSlop={4}>
+            <CrestAvatar name={profile.name} photoUri={profile.avatarUrl} size={155} />
+          </AnimatedPressable>
 
           {/* Streak counter — mock until real attendance tracking exists */}
           <View style={styles.streakPill}>
@@ -246,6 +259,27 @@ export default function ProfileScreen() {
           name={profile.name}
         />
       ) : null}
+
+      {/* Instagram-style enlarged view of the profile picture */}
+      <Modal
+        visible={avatarViewerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAvatarViewerOpen(false)}>
+        <Pressable style={styles.avatarViewerBackdrop} onPress={() => setAvatarViewerOpen(false)}>
+          <AnimatedPressable
+            style={styles.avatarViewerClose}
+            onPress={() => setAvatarViewerOpen(false)}
+            hitSlop={10}>
+            <X size={26} color="#FFFFFF" strokeWidth={2} />
+          </AnimatedPressable>
+          <CrestAvatar
+            name={profile.name}
+            photoUri={profile.avatarUrl}
+            size={Math.round(Dimensions.get('window').width * 0.8)}
+          />
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -368,6 +402,13 @@ function makeStyles(colors: ThemeColors) {
       paddingHorizontal: 12,
     },
     sportTagsWrap: { alignItems: 'center', marginTop: 14 },
+    avatarViewerBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.85)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarViewerClose: { position: 'absolute', top: 60, right: 24 },
     actionRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
     secondaryButton: {
       flex: 1,
