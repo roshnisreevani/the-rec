@@ -13,12 +13,20 @@ import { CommentsModal } from '@/components/feed/comments-modal';
 import { FeedCarousel } from '@/components/feed/feed-carousel';
 import { FeedEndCard } from '@/components/feed/feed-end-card';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { WEIGHT, type ThemeColors } from '@/constants/style';
+import { RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { useReactionStreak } from '@/lib/feed-streak';
 import { blockUser, reportContent, type ReportReason } from '@/lib/moderation';
-import { computePostOfWeekId, deletePost, fetchFeed, setReaction, totalReactions, type Post } from '@/lib/posts';
+import {
+  archivePost,
+  computePostOfWeekId,
+  fetchFeed,
+  setReaction,
+  totalReactions,
+  type FeedScope,
+  type Post,
+} from '@/lib/posts';
 import { HOT_THRESHOLD, type ReactionType } from '@/lib/reactions';
 
 export default function FeedScreen() {
@@ -33,14 +41,15 @@ export default function FeedScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
+  const [scope, setScope] = useState<FeedScope>('following');
 
   const { streak, onLeavePost } = useReactionStreak();
 
   const load = useCallback(
-    async (isRefresh = false) => {
+    async (isRefresh = false, scopeOverride?: FeedScope) => {
       if (isRefresh) setRefreshing(true);
       try {
-        const fetched = await fetchFeed(userId);
+        const fetched = await fetchFeed(userId, scopeOverride ?? scope);
         setPosts(fetched);
       } catch (e) {
         Alert.alert('Could not load Feed', e instanceof Error ? e.message : 'Unknown error.');
@@ -49,7 +58,7 @@ export default function FeedScreen() {
         setRefreshing(false);
       }
     },
-    [userId]
+    [userId, scope]
   );
 
   useFocusEffect(
@@ -57,6 +66,15 @@ export default function FeedScreen() {
       load();
     }, [load])
   );
+
+  // Passes the new scope explicitly rather than waiting on the setScope
+  // state update to land, so the very next fetch is guaranteed correct.
+  const handleScopeChange = (next: FeedScope) => {
+    if (next === scope) return;
+    setScope(next);
+    setLoading(true);
+    load(false, next);
+  };
 
   const postOfWeekId = useMemo(() => computePostOfWeekId(posts), [posts]);
   const commentsPost = posts.find((p) => p.id === commentsPostId) ?? null;
@@ -102,20 +120,23 @@ export default function FeedScreen() {
     }
   };
 
+  // "Delete" from Feed is a soft-delete: the post moves to the author's
+  // private Archive rather than being destroyed. It can still be reshared,
+  // promoted to Profile, or permanently deleted from there.
   const handleDeletePost = (post: Post) => {
-    Alert.alert('Delete this post?', undefined, [
+    Alert.alert('Move this post to your Archive?', "You can reshare it, add it to your Profile, or delete it for good from there.", [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
+        text: 'Archive',
         style: 'destructive',
         onPress: async () => {
           const prev = posts;
           setPosts((p) => p.filter((x) => x.id !== post.id));
           try {
-            await deletePost(post);
+            await archivePost(post);
           } catch (e) {
             setPosts(prev);
-            Alert.alert('Could not delete post', e instanceof Error ? e.message : 'Unknown error.');
+            Alert.alert('Could not archive post', e instanceof Error ? e.message : 'Unknown error.');
           }
         },
       },
@@ -168,6 +189,11 @@ export default function FeedScreen() {
         </AnimatedPressable>
       </View>
 
+      <View style={styles.scopeRow}>
+        <ScopeTab label="Following" active={scope === 'following'} onPress={() => handleScopeChange('following')} styles={styles} />
+        <ScopeTab label="Discover" active={scope === 'discover'} onPress={() => handleScopeChange('discover')} styles={styles} />
+      </View>
+
       {userId ? (
         <ScrollView
           ref={scrollRef}
@@ -178,7 +204,9 @@ export default function FeedScreen() {
           showsVerticalScrollIndicator={false}>
           {posts.length === 0 ? (
             <Text style={styles.empty}>
-              Nothing on Feed yet. Tap the + tab to post the first play of the week.
+              {scope === 'following'
+                ? 'Nothing from people you follow yet. Check Discover, or follow more people from the search icon above.'
+                : 'Nothing on Feed yet. Tap the + tab to post the first play of the week.'}
             </Text>
           ) : (
             <>
@@ -217,6 +245,24 @@ export default function FeedScreen() {
   );
 }
 
+function ScopeTab({
+  label,
+  active,
+  onPress,
+  styles,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  styles: ReturnType<typeof makeStyles>;
+}) {
+  return (
+    <AnimatedPressable style={[styles.scopeTab, active && styles.scopeTabActive]} onPress={onPress} hitSlop={4}>
+      <Text style={[styles.scopeTabText, active && styles.scopeTabTextActive]}>{label}</Text>
+    </AnimatedPressable>
+  );
+}
+
 function makeStyles(colors: ThemeColors) {
   return StyleSheet.create({
     flex: { flex: 1, backgroundColor: colors.background },
@@ -229,6 +275,23 @@ function makeStyles(colors: ThemeColors) {
       paddingVertical: 12,
     },
     headerTitle: { fontSize: 20, fontWeight: WEIGHT.bold, color: colors.text },
+    scopeRow: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingHorizontal: 20,
+      paddingBottom: 10,
+    },
+    scopeTab: {
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: RADII.pill,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+    },
+    scopeTabActive: { backgroundColor: colors.text, borderColor: colors.text },
+    scopeTabText: { fontSize: 13, fontWeight: WEIGHT.semibold, color: colors.textSecondary },
+    scopeTabTextActive: { color: colors.background },
     list: { paddingBottom: 40 },
     empty: {
       marginTop: 60,

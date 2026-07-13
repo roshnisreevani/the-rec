@@ -21,7 +21,7 @@ export const unstable_settings = {
 };
 
 function RootNavigator() {
-  const { session, initializing } = useAuth();
+  const { session, initializing, isPasswordRecovery } = useAuth();
   const { mode, colors } = useTheme();
 
   return (
@@ -32,7 +32,12 @@ function RootNavigator() {
         </View>
       ) : (
         <Stack>
-          <Stack.Protected guard={!!session}>
+          {/* Password-reset link opened the app: show only the "set a new
+              password" screen, regardless of session state, until it's done. */}
+          <Stack.Protected guard={isPasswordRecovery}>
+            <Stack.Screen name="reset-password" options={{ headerShown: false }} />
+          </Stack.Protected>
+          <Stack.Protected guard={!isPasswordRecovery && !!session}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
             <Stack.Screen name="edit-profile" options={{ headerShown: false, presentation: 'modal' }} />
@@ -53,7 +58,7 @@ function RootNavigator() {
             <Stack.Screen name="connections" options={{ headerShown: false }} />
             <Stack.Screen name="my-groups" options={{ headerShown: false }} />
           </Stack.Protected>
-          <Stack.Protected guard={!session}>
+          <Stack.Protected guard={!isPasswordRecovery && !session}>
             <Stack.Screen name="auth" options={{ headerShown: false }} />
           </Stack.Protected>
         </Stack>

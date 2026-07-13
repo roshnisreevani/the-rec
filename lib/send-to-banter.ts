@@ -35,30 +35,17 @@ export async function sendPostToPosterDm(post: Post, senderId: string): Promise<
  * messages.image_url, so the group thread shows a real thumbnail instead of
  * a raw storage link.
  *
- * Important known gap: Feed's posts.group_id currently holds *mock* group
- * ids (see lib/groups-mock.ts) since real Groups membership isn't wired
- * into Feed yet, while Banter's conversations.group_id points at real
- * `groups` table rows created by the Groups feature. Those two ids don't
- * overlap today, so fetchGroupConversationId() will almost always return
- * null for a real post right now. This function fails soft in that case
- * (returns false, doesn't throw) so the caller can be honest with the user
- * about whether the message actually landed somewhere, rather than the app
- * pretending it was delivered. Once Feed posts reference real group ids,
- * this starts working end-to-end with no changes needed here.
+ * Groups are optional on posts now, so a group-less post has nowhere to
+ * forward to — fails soft (returns false, doesn't throw) so the caller can
+ * be honest with the user about whether the message actually landed
+ * somewhere, rather than the app pretending it was delivered.
  */
 export async function sendPostToBanter(post: Post, senderId: string): Promise<boolean> {
-  if (!post.groupId) {
-    // Post isn't attached to a group (groups are now optional on posts) —
-    // there's no group Banter thread to forward into.
-    return false;
-  }
+  if (!post.groupId) return false;
   try {
-    if (!post.groupId) return false; // group-less post — nowhere to forward
     const conversationId = await fetchGroupConversationId(post.groupId);
     if (!conversationId) {
-      console.warn(
-        `[send-to-banter] no Banter thread found for group "${post.groupId}" — likely a mock Feed group id with no matching real group yet.`
-      );
+      console.warn(`[send-to-banter] no Banter thread found for group "${post.groupId}".`);
       return false;
     }
 
