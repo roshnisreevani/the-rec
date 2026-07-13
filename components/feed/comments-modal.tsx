@@ -15,8 +15,9 @@ import {
 } from 'react-native';
 
 import { ContentMenu } from '@/components/moderation/content-menu';
+import { CrestAvatar } from '@/components/profile/crest-avatar';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
+import { FONTS, ON_ACCENT, RADII, type ThemeColors } from '@/constants/style';
 import { useThemeColors } from '@/contexts/theme-context';
 import { blockUser, reportContent, type ReportReason } from '@/lib/moderation';
 import { addComment, deleteComment, fetchComments, type Comment } from '@/lib/posts';
@@ -157,9 +158,15 @@ export function CommentsModal({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet">
       <View style={[styles.flex, Platform.OS === 'ios' && { paddingBottom: keyboardHeight }]}>
+        {/* Drag handle */}
+        <View style={styles.handleWrap}>
+          <View style={styles.handle} />
+        </View>
+
         <View style={styles.header}>
+          <View style={{ width: 48 }} />
           <Text style={styles.headerTitle}>Comments</Text>
-          <AnimatedPressable onPress={onClose} hitSlop={8}>
+          <AnimatedPressable onPress={onClose} hitSlop={8} style={styles.doneWrap}>
             <Text style={styles.closeText}>Done</Text>
           </AnimatedPressable>
         </View>
@@ -174,15 +181,18 @@ export function CommentsModal({
               <Text style={styles.empty}>No comments yet — say something.</Text>
             ) : (
               comments.map((c) => (
-                <View key={c.id} style={styles.commentRow}>
-                  <View style={styles.commentTextWrap}>
-                    <Text style={styles.commentAuthor}>{c.authorName}</Text>
-                    <Text style={styles.commentBody}>{c.body}</Text>
+                  <View key={c.id} style={styles.commentRow}>
+                    <CrestAvatar name={c.authorName} photoUri={c.authorAvatarUrl} size={44} />
+                    <View style={styles.commentTextWrap}>
+                      <Text style={styles.commentInline}>
+                        <Text style={styles.commentAuthor}>{c.authorName} </Text>
+                        <Text style={styles.commentBody}>{c.body}</Text>
+                      </Text>
+                    </View>
+                    <Pressable hitSlop={12} onPress={() => setMenuComment(c)} style={styles.moreBtn}>
+                      <MoreHorizontal size={18} color={colors.textSecondary} strokeWidth={1.75} />
+                    </Pressable>
                   </View>
-                  <Pressable hitSlop={8} onPress={() => setMenuComment(c)}>
-                    <MoreHorizontal size={16} color={colors.textSecondary} strokeWidth={1.75} />
-                  </Pressable>
-                </View>
               ))
             )}
           </ScrollView>
@@ -191,7 +201,7 @@ export function CommentsModal({
         <View style={styles.composer}>
           <TextInput
             style={styles.input}
-            placeholder="Add a comment"
+            placeholder="Add a comment…"
             placeholderTextColor={colors.textSecondary}
             value={body}
             onChangeText={setBody}
@@ -225,53 +235,60 @@ export function CommentsModal({
 function makeStyles(colors: ThemeColors) {
   return StyleSheet.create({
     flex: { flex: 1, backgroundColor: colors.background },
+    handleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 4 },
+    handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.border,
     },
-    headerTitle: { fontSize: 16, fontWeight: WEIGHT.bold, color: colors.text },
-    closeText: { fontSize: 14, fontWeight: WEIGHT.semibold, color: colors.coral },
+    headerTitle: { fontSize: 17, fontFamily: FONTS.displaySemibold, color: colors.text },
+    doneWrap: { width: 48, alignItems: 'flex-end' },
+    closeText: { fontSize: 16, fontFamily: FONTS.displaySemibold, color: colors.coral },
     loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    list: { padding: 16, gap: 14 },
-    empty: { fontStyle: 'italic', color: colors.textSecondary, fontSize: 13 },
-    commentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-    commentTextWrap: { flex: 1, gap: 2 },
-    commentAuthor: { fontSize: 12, fontWeight: WEIGHT.semibold, color: colors.text },
-    commentBody: { fontSize: 14, color: colors.text },
+    list: { padding: 16, gap: 18 },
+    empty: { fontStyle: 'italic', color: colors.textSecondary, fontSize: 15, textAlign: 'center', marginTop: 32 },
+    commentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+    commentTextWrap: { flex: 1, paddingTop: 2 },
+    commentInline: { fontSize: 15, lineHeight: 21, color: colors.text },
+    commentAuthor: { fontFamily: FONTS.displaySemibold, fontSize: 15, color: colors.text },
+    commentBody: { fontFamily: FONTS.displayRegular, fontSize: 15, color: colors.text },
+    moreBtn: { paddingTop: 8, paddingLeft: 4 },
     composer: {
       flexDirection: 'row',
       alignItems: 'flex-end',
       gap: 10,
-      padding: 12,
-      borderTopWidth: 1,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
     },
     input: {
       flex: 1,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: RADII.md,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      fontSize: 14,
+      borderRadius: RADII.pill,
+      paddingHorizontal: 16,
+      paddingVertical: 11,
+      fontSize: 15,
+      fontFamily: FONTS.displayRegular,
       color: colors.text,
-      maxHeight: 90,
+      maxHeight: 100,
       backgroundColor: colors.background,
     },
     sendButton: {
       backgroundColor: colors.coral,
       borderRadius: RADII.pill,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      minWidth: 58,
+      paddingHorizontal: 18,
+      paddingVertical: 11,
+      minWidth: 62,
       alignItems: 'center',
     },
     sendButtonDisabled: { opacity: 0.4 },
-    sendButtonText: { color: ON_ACCENT, fontWeight: WEIGHT.bold, fontSize: 13 },
+    sendButtonText: { color: ON_ACCENT, fontFamily: FONTS.displaySemibold, fontSize: 15 },
   });
 }
