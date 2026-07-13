@@ -78,9 +78,9 @@ export const ON_DARK_SURFACE_SECONDARY = '#9A968C';
 // used for wordmarks/names/section titles). FONTS.marker is a bold
 // handwritten accent font used sparingly for playful moments.
 export const FONTS = {
-  display: 'SpaceGrotesk_700Bold',
-  displaySemibold: 'SpaceGrotesk_600SemiBold',
-  displayMedium: 'SpaceGrotesk_500Medium',
-  displayRegular: 'SpaceGrotesk_400Regular',
+  display: 'Urbanist_700Bold',
+  displaySemibold: 'Urbanist_600SemiBold',
+  displayMedium: 'Urbanist_500Medium',
+  displayRegular: 'Urbanist_400Regular',
   marker: 'PermanentMarker_400Regular',
 } as const;

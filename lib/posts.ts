@@ -1,9 +1,13 @@
 import { File } from 'expo-file-system';
 
+import { withArchiveStatus } from '@/lib/archive';
+import { fetchFollowingIds } from '@/lib/follows';
 import { getMockGroup } from '@/lib/groups-mock';
 import { fetchBlockedUserIds } from '@/lib/moderation';
 import { POST_OF_WEEK_WINDOW_DAYS, REACTIONS, type ReactionType } from '@/lib/reactions';
 import { supabase } from '@/lib/supabase';
+
+export type FeedScope = 'following' | 'discover';
 
 export type MediaType = 'image' | 'video';
 
@@ -20,6 +24,7 @@ export type Post = {
   mediaUrl: string;
   mediaType: MediaType;
   createdAt: string;
+  archivedAt: string | null;
   reactionCounts: Record<ReactionType, number>;
   myReactions: ReactionType[];
   commentCount: number;
@@ -47,6 +52,7 @@ type PostRow = {
   media_url: string;
   media_type: MediaType;
   created_at: string;
+  archived_at: string | null;
   author: { name: string | null; avatar_url: string | null } | null;
   reactions: ReactionRow[] | null;
   comments: CommentCountRow[] | null;
@@ -89,36 +95,75 @@ function rowToPost(row: PostRow, currentUserId: string | undefined): Post {
     mediaUrl: row.media_url,
     mediaType: row.media_type,
     createdAt: row.created_at,
+    archivedAt: row.archived_at,
     reactionCounts,
     myReactions,
     commentCount: row.comments?.[0]?.count ?? 0,
   };
 }
 
+const POST_SELECT =
+  '*, author:profiles(name, avatar_url), reactions:post_reactions(type, user_id), comments:post_comments(count)';
+
 /**
- * Chronological feed. "Groups the user is a member of" is currently every
- * mock group (see lib/groups-mock.ts) since real membership doesn't exist
- * yet — once it does, add a `.in('group_id', memberGroupIds)` filter here.
+ * Chronological feed, scoped to either "following" (posts from people you
+ * follow, plus your own) or "discover" (everyone — the old unfiltered
+ * behavior). Defaults to "following".
+ *
+ * "Groups the user is a member of" is currently every mock group (see
+ * lib/groups-mock.ts) since real membership doesn't exist yet — once it
+ * does, add a `.in('group_id', memberGroupIds)` filter here.
  *
  * Posts from anyone the current user has blocked are filtered out client
  * side (rather than in the query) since the block list is small and this
- * keeps the Supabase query itself simple.
+ * keeps the Supabase query itself simple. Posts that have aged out to
+ * Archive (see lib/archive.ts) are excluded from both scopes — Archive is
+ * browsed separately, never mixed into Feed.
  */
-export async function fetchFeed(currentUserId: string | undefined): Promise<Post[]> {
-  const [{ data, error }, blockedIds] = await Promise.all([
-    supabase
-      .from('posts')
-      .select('*, author:profiles(name, avatar_url), reactions:post_reactions(type, user_id), comments:post_comments(count)')
-      .order('created_at', { ascending: false }),
+export async function fetchFeed(currentUserId: string | undefined, scope: FeedScope = 'following'): Promise<Post[]> {
+  const [{ data, error }, blockedIds, followingIds] = await Promise.all([
+    supabase.from('posts').select(POST_SELECT).order('created_at', { ascending: false }),
     fetchBlockedUserIds(currentUserId),
+    scope === 'following' && currentUserId ? fetchFollowingIds(currentUserId) : Promise.resolve<string[]>([]),
   ]);
 
   if (error) throw error;
 
   const blocked = new Set(blockedIds);
-  return ((data ?? []) as unknown as PostRow[])
+  const allPosts = ((data ?? []) as unknown as PostRow[])
     .filter((row) => !blocked.has(row.author_id))
     .map((row) => rowToPost(row, currentUserId));
+
+  // Archive rank/floor is computed across every fetched post so it's correct
+  // regardless of which scope is asking — a "following" view and a
+  // "discover" view of the same author's posts must agree on which of that
+  // author's posts have aged out.
+  const active = withArchiveStatus(allPosts).filter((p) => !p.isArchived);
+
+  if (scope === 'discover') return active;
+
+  const followingSet = new Set(followingIds);
+  return active.filter((p) => p.authorId === currentUserId || followingSet.has(p.authorId));
+}
+
+/**
+ * The current user's own posts that have aged out to their private Archive.
+ * Never anyone else's — Archive is always just your own old posts, browsed
+ * on your own terms, not a public or shared view.
+ */
+export async function fetchArchivedPosts(userId: string): Promise<Post[]> {
+  const { data, error } = await supabase
+    .from('posts')
+    .select(POST_SELECT)
+    .eq('author_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  const posts = ((data ?? []) as unknown as PostRow[]).map((row) => rowToPost(row, userId));
+  return withArchiveStatus(posts)
+    .filter((p) => p.isArchived)
+    .map(({ isArchived: _isArchived, ...post }) => post);
 }
 
 /** Posts scoped to one group, newest first. RLS additionally guarantees only
@@ -295,10 +340,14 @@ function storagePathFromPublicUrl(bucket: string, url: string): string | null {
 }
 
 /**
- * Deletes a post and, best-effort, its media file from the feed-media
- * bucket. Storage cleanup failures are logged but never block the post row
- * itself from being deleted — an orphaned file is a lot less bad than being
- * unable to delete your own post.
+ * Permanently deletes a post and, best-effort, its media file from the
+ * feed-media bucket. Storage cleanup failures are logged but never block
+ * the post row itself from being deleted — an orphaned file is a lot less
+ * bad than being unable to delete your own post.
+ *
+ * This is real, irreversible deletion — only ever offered from within
+ * Archive ("Delete forever"), never from Feed. Deleting from Feed itself
+ * goes through archivePost instead.
  */
 export async function deletePost(post: Pick<Post, 'id' | 'mediaUrl'>): Promise<void> {
   const path = storagePathFromPublicUrl('feed-media', post.mediaUrl);
@@ -310,5 +359,75 @@ export async function deletePost(post: Pick<Post, 'id' | 'mediaUrl'>): Promise<v
   }
 
   const { error } = await supabase.from('posts').delete().eq('id', post.id);
+  if (error) throw error;
+}
+
+/**
+ * Soft-delete: what "delete" from Feed actually does now. The post isn't
+ * removed — it's marked archived and immediately drops out of Feed,
+ * landing in the author's private Archive alongside anything that aged out
+ * naturally. Nothing is lost; the author can still reshare it or promote it
+ * to their Profile from there, or delete it for real.
+ */
+export async function archivePost(post: Pick<Post, 'id'>): Promise<void> {
+  const { error } = await supabase.from('posts').update({ archived_at: new Date().toISOString() }).eq('id', post.id);
+  if (error) throw error;
+}
+
+/**
+ * "Reshare" from Archive: posts a brand-new copy of the same photo/caption
+ * (fresh id, fresh timestamp, starts with 0 reactions/comments). The
+ * original stays exactly where it was in Archive, untouched — this is
+ * closer to resharing an old memory than un-deleting something.
+ */
+export async function resharePost(
+  post: Pick<Post, 'authorId' | 'groupId' | 'sportTag' | 'caption' | 'mediaUrl' | 'mediaType'>
+): Promise<void> {
+  const { error } = await supabase.from('posts').insert({
+    author_id: post.authorId,
+    group_id: post.groupId,
+    sport_tag: post.sportTag,
+    caption: post.caption,
+    media_url: post.mediaUrl,
+    media_type: post.mediaType,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Ids of the current user's own posts currently promoted to their Profile's
+ * Featured section — used by the Archive screen to show "Add to Profile"
+ * vs. "Remove from Profile" per tile.
+ */
+export async function fetchFeaturedPostIds(userId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.from('featured_posts').select('post_id').eq('user_id', userId);
+  if (error) throw error;
+  return new Set((data ?? []).map((r) => r.post_id as string));
+}
+
+/** The current user's own posts, promoted onto their public Profile. */
+export async function fetchFeaturedPosts(userId: string): Promise<Post[]> {
+  const { data, error } = await supabase
+    .from('featured_posts')
+    .select(`post:posts(${POST_SELECT})`)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return ((data ?? []) as unknown as { post: PostRow | null }[])
+    .filter((row): row is { post: PostRow } => row.post !== null)
+    .map((row) => rowToPost(row.post, userId));
+}
+
+/** Promotes one of your own archived posts to your public Profile. */
+export async function featurePost(userId: string, postId: string): Promise<void> {
+  const { error } = await supabase.from('featured_posts').insert({ user_id: userId, post_id: postId });
+  if (error) throw error;
+}
+
+/** Removes a post from your Profile's Featured section (post itself is untouched). */
+export async function unfeaturePost(userId: string, postId: string): Promise<void> {
+  const { error } = await supabase.from('featured_posts').delete().eq('user_id', userId).eq('post_id', postId);
   if (error) throw error;
 }

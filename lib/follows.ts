@@ -94,6 +94,13 @@ export async function fetchFollowing(userId: string): Promise<FollowUser[]> {
   ).map((row) => toFollowUser(row.followee_id, row.followee, row.created_at));
 }
 
+/** Just the ids of who the given user follows — used for Feed's Following scope. */
+export async function fetchFollowingIds(userId: string): Promise<string[]> {
+  const { data, error } = await supabase.from('follows').select('followee_id').eq('follower_id', userId);
+  if (error) throw error;
+  return (data ?? []).map((r) => r.followee_id as string);
+}
+
 /** Counts from the same table the lists read, so they always match. */
 export async function fetchFollowCounts(userId: string): Promise<{ followers: number; following: number }> {
   const [followersRes, followingRes] = await Promise.all([

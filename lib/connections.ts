@@ -1,25 +1,12 @@
 import { fetchBlockedEitherDirection } from '@/lib/moderation';
 import { supabase } from '@/lib/supabase';
 
-export type ConnectionStatus = 'pending' | 'accepted';
-
-export type ConnectionState = {
-  connectionId: string | null;
-  status: ConnectionStatus | null;
-  // Only meaningful when status === 'pending' — true if the current user
-  // sent the request (so they'd see "Cancel"), false if they received it
-  // (so they'd see "Accept"/"Decline").
-  requestedByMe: boolean;
-};
-
-export type ConnectionRequest = {
-  connectionId: string;
-  otherUserId: string;
-  otherUserName: string;
-  otherUserAvatarUrl: string | null;
-  otherUserLocation: string;
-  createdAt: string;
-};
+// The request/accept "connections" concept was replaced by the directional
+// Follows model (see lib/follows.ts + supabase/migrations/20260712000000_follows.sql).
+// What's left here is everything that never depended on that concept:
+// private-profile settings, per-user notes, and person search. The legacy
+// `connections` table itself is kept read-only in the DB (no code writes to
+// it anymore) per that migration's own comment.
 
 export type PersonSearchResult = {
   id: string;
@@ -32,149 +19,6 @@ export type ConnectionNote = {
   note: string;
   updatedAt: string | null;
 };
-
-// Every row is stored with user_a < user_b so a pair never produces two rows
-// (one for each request direction).
-function canonicalPair(a: string, b: string): [string, string] {
-  return a < b ? [a, b] : [b, a];
-}
-
-type ConnectionRow = {
-  id: string;
-  user_a: string;
-  user_b: string;
-  status: ConnectionStatus;
-  requested_by: string;
-  created_at: string;
-  profileA: { name: string | null; avatar_url: string | null; location: string | null } | null;
-  profileB: { name: string | null; avatar_url: string | null; location: string | null } | null;
-};
-
-function rowToRequest(row: ConnectionRow, currentUserId: string): ConnectionRequest {
-  const isUserA = row.user_a === currentUserId;
-  const otherProfile = isUserA ? row.profileB : row.profileA;
-  const otherUserId = isUserA ? row.user_b : row.user_a;
-
-  return {
-    connectionId: row.id,
-    otherUserId,
-    otherUserName: otherProfile?.name?.trim() || 'Nameless legend',
-    otherUserAvatarUrl: otherProfile?.avatar_url ?? null,
-    otherUserLocation: otherProfile?.location ?? '',
-    createdAt: row.created_at,
-  };
-}
-
-const REQUEST_SELECT =
-  '*, profileA:profiles!connections_user_a_fkey(name, avatar_url, location), profileB:profiles!connections_user_b_fkey(name, avatar_url, location)';
-
-/**
- * Current connection state between the current user and someone else's
- * profile — drives which button (Connect / Pending / Connected) shows on
- * the read-only profile screen.
- */
-export async function fetchConnectionState(currentUserId: string, otherUserId: string): Promise<ConnectionState> {
-  const [userA, userB] = canonicalPair(currentUserId, otherUserId);
-
-  const { data, error } = await supabase
-    .from('connections')
-    .select('id, status, requested_by')
-    .eq('user_a', userA)
-    .eq('user_b', userB)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data) return { connectionId: null, status: null, requestedByMe: false };
-
-  return {
-    connectionId: data.id,
-    status: data.status as ConnectionStatus,
-    requestedByMe: data.requested_by === currentUserId,
-  };
-}
-
-export async function sendConnectionRequest(currentUserId: string, otherUserId: string): Promise<void> {
-  const [userA, userB] = canonicalPair(currentUserId, otherUserId);
-  const { error } = await supabase.from('connections').insert({
-    user_a: userA,
-    user_b: userB,
-    requested_by: currentUserId,
-    status: 'pending',
-  });
-  if (error) throw error;
-}
-
-export async function acceptConnection(connectionId: string): Promise<void> {
-  const { error } = await supabase
-    .from('connections')
-    .update({ status: 'accepted', responded_at: new Date().toISOString() })
-    .eq('id', connectionId);
-  if (error) throw error;
-}
-
-/**
- * Covers decline (recipient rejecting a pending request), cancel (requester
- * withdrawing their own pending request), and disconnect (either side of an
- * already-accepted connection) — all are just "remove this row."
- */
-export async function removeConnection(connectionId: string): Promise<void> {
-  const { error } = await supabase.from('connections').delete().eq('id', connectionId);
-  if (error) throw error;
-}
-
-export async function fetchReceivedRequests(userId: string): Promise<ConnectionRequest[]> {
-  const { data, error } = await supabase
-    .from('connections')
-    .select(REQUEST_SELECT)
-    .eq('status', 'pending')
-    .neq('requested_by', userId)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return ((data ?? []) as unknown as ConnectionRow[]).map((row) => rowToRequest(row, userId));
-}
-
-export async function fetchSentRequests(userId: string): Promise<ConnectionRequest[]> {
-  const { data, error } = await supabase
-    .from('connections')
-    .select(REQUEST_SELECT)
-    .eq('status', 'pending')
-    .eq('requested_by', userId)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return ((data ?? []) as unknown as ConnectionRow[]).map((row) => rowToRequest(row, userId));
-}
-
-/**
- * Lightweight count (no profile joins) of pending requests the current user
- * has received — just for the small badge on Profile's Connections icon.
- */
-export async function fetchReceivedRequestsCount(userId: string): Promise<number> {
-  const { count, error } = await supabase
-    .from('connections')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'pending')
-    .neq('requested_by', userId);
-
-  if (error) throw error;
-  return count ?? 0;
-}
-
-/**
- * Count of accepted connections for the profile stat row. No explicit
- * user_a/user_b filter needed — RLS already restricts rows to ones the
- * current user is part of.
- */
-export async function fetchConnectionsCount(userId: string): Promise<number> {
-  const { count, error } = await supabase
-    .from('connections')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'accepted');
-
-  if (error) throw error;
-  return count ?? 0;
-}
 
 export async function fetchAllowsConnectionRequests(userId: string): Promise<boolean> {
   const { data, error } = await supabase
@@ -201,25 +45,6 @@ export async function fetchIsPrivate(userId: string): Promise<boolean> {
 export async function updateIsPrivate(userId: string, isPrivate: boolean): Promise<void> {
   const { error } = await supabase.from('profiles').update({ is_private: isPrivate }).eq('id', userId);
   if (error) throw error;
-}
-
-/**
- * Count of connections the current user shares with someone else's profile
- * — shown as "X mutual connections" while not yet connected to them. Backed
- * by a SECURITY DEFINER RPC (mutual_connections_count) since RLS alone can't
- * let one user see whether a *third* person is connected to someone else;
- * see the mutual_connections_count_fn migration. Fails soft (returns 0)
- * since this is a nice-to-have detail, not core functionality.
- */
-export async function fetchMutualConnectionsCount(otherUserId: string): Promise<number> {
-  try {
-    const { data, error } = await supabase.rpc('mutual_connections_count', { other_user_id: otherUserId });
-    if (error) throw error;
-    return (data as number | null) ?? 0;
-  } catch (e) {
-    console.warn('[connections] could not fetch mutual connections count:', e);
-    return 0;
-  }
 }
 
 /**

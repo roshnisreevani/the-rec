@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Bell, Flame, MapPin, Settings, Users, X } from 'lucide-react-native';
+import { Archive, Bell, Flame, MapPin, Settings, Users, X } from 'lucide-react-native';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +21,11 @@ import { PinnieIcon } from '@/components/profile/pinnie-icon';
 import { QrShareModal } from '@/components/profile/qr-share-modal';
 import { SportTagsField } from '@/components/profile/sport-tags-field';
 import { TrophyCase } from '@/components/profile/trophy-case';
+<<<<<<< HEAD
+import { WalkupSongRow } from '@/components/profile/walkup-song-row';
+import { PostThumbnailGrid } from '@/components/feed/post-thumbnail-grid';
+=======
+>>>>>>> cb3c8f411e3e9e66ddeac78ba2611d7a4451b83e
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { FONTS, ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
@@ -29,6 +34,7 @@ import { fetchFollowCounts } from '@/lib/follows';
 import { fetchMyGroupsCount } from '@/lib/groups';
 import { MOCK_STREAK_WEEKS } from '@/lib/mock-stats';
 import { fetchUnreadNotificationCount } from '@/lib/notifications';
+import { fetchFeaturedPosts, type Post } from '@/lib/posts';
 import { emptyProfile, fetchProfile, saveProfile, type Profile, type Trophy } from '@/lib/profile';
 
 function generateId(): string {
@@ -49,6 +55,7 @@ export default function ProfileScreen() {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [groupsCount, setGroupsCount] = useState(0);
+  const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -79,6 +86,11 @@ export default function ProfileScreen() {
       setGroupsCount(await fetchMyGroupsCount(userId));
     } catch {
       // Non-critical.
+    }
+    try {
+      setFeaturedPosts(await fetchFeaturedPosts(userId));
+    } catch {
+      // Non-critical — Featured section just stays empty if this fails.
     }
   }, [userId]);
 
@@ -160,6 +172,9 @@ export default function ProfileScreen() {
           <View style={styles.topIcons}>
             <AnimatedPressable hitSlop={8} onPress={() => router.push('/connections')}>
               <Users size={22} color={colors.text} strokeWidth={1.75} />
+            </AnimatedPressable>
+            <AnimatedPressable hitSlop={8} onPress={() => router.push('/archive')}>
+              <Archive size={22} color={colors.text} strokeWidth={1.75} />
             </AnimatedPressable>
             <AnimatedPressable hitSlop={8} onPress={() => router.push('/notifications')} style={styles.iconWrap}>
               <Bell size={22} color={colors.text} strokeWidth={1.75} />
@@ -247,6 +262,14 @@ export default function ProfileScreen() {
         <Section title="Pick Your 3" styles={styles}>
           <PickThreeField editing={false} items={profile.pickThree} />
         </Section>
+
+        {/* Featured — posts promoted from Archive, deliberately separate
+            from Pick Your 3. Read-only here; managed from /archive. */}
+        {featuredPosts.length > 0 ? (
+          <Section title="Featured" styles={styles}>
+            <PostThumbnailGrid posts={featuredPosts} colors={colors} />
+          </Section>
+        ) : null}
       </ScrollView>
 
       {userId ? (

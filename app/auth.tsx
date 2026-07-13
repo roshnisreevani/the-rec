@@ -16,11 +16,11 @@ import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 
 export default function AuthScreen() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -28,8 +28,35 @@ export default function AuthScreen() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const isSignup = mode === 'signup';
+  const isReset = mode === 'reset';
+
+  const switchMode = (next: 'login' | 'signup' | 'reset') => {
+    setMode(next);
+    setError(null);
+    setNotice(null);
+  };
 
   const handleSubmit = async () => {
+    if (isReset) {
+      if (!email.trim()) {
+        setError('Enter the email on your account first.');
+        return;
+      }
+      setSubmitting(true);
+      setError(null);
+      setNotice(null);
+      const result = await resetPassword(email.trim());
+      setSubmitting(false);
+
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setNotice("Check your inbox for a reset link — it'll bring you right back here.");
+      setMode('login');
+      return;
+    }
+
     if (!email.trim() || !password) {
       setError("Can't show up empty-handed — fill in both fields.");
       return;
@@ -80,15 +107,23 @@ export default function AuthScreen() {
             value={email}
             onChangeText={setEmail}
           />
-          <TextInput
-            style={styles.input}
-            placeholder="password"
-            placeholderTextColor={colors.textSecondary}
-            secureTextEntry
-            autoCapitalize="none"
-            value={password}
-            onChangeText={setPassword}
-          />
+          {isReset ? null : (
+            <TextInput
+              style={styles.input}
+              placeholder="password"
+              placeholderTextColor={colors.textSecondary}
+              secureTextEntry
+              autoCapitalize="none"
+              value={password}
+              onChangeText={setPassword}
+            />
+          )}
+
+          {!isReset && !isSignup ? (
+            <AnimatedPressable onPress={() => switchMode('reset')} hitSlop={8} haptic={false} style={styles.forgotRow}>
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </AnimatedPressable>
+          ) : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {notice ? <Text style={styles.notice}>{notice}</Text> : null}
@@ -100,13 +135,22 @@ export default function AuthScreen() {
             {submitting ? (
               <ActivityIndicator color={ON_ACCENT} />
             ) : (
-              <Text style={styles.buttonText}>{isSignup ? 'Create Account' : 'Sign In'}</Text>
+              <Text style={styles.buttonText}>
+                {isReset ? 'Send Reset Link' : isSignup ? 'Create Account' : 'Sign In'}
+              </Text>
             )}
           </AnimatedPressable>
 
-          <AnimatedPressable onPress={() => setMode(isSignup ? 'login' : 'signup')} hitSlop={8} haptic={false}>
+          <AnimatedPressable
+            onPress={() => switchMode(isReset ? 'login' : isSignup ? 'login' : 'signup')}
+            hitSlop={8}
+            haptic={false}>
             <Text style={styles.switchText}>
-              {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Create Account"}
+              {isReset
+                ? 'Back to sign in'
+                : isSignup
+                  ? 'Already have an account? Sign in'
+                  : "Don't have an account? Create Account"}
             </Text>
           </AnimatedPressable>
         </View>
@@ -134,6 +178,8 @@ function makeStyles(colors: ThemeColors) {
       color: colors.text,
       backgroundColor: colors.background,
     },
+    forgotRow: { alignSelf: 'flex-end' },
+    forgotText: { color: colors.textSecondary, fontSize: 13 },
     error: { color: colors.danger, textAlign: 'center', fontSize: 13 },
     notice: { color: colors.text, textAlign: 'center', fontSize: 13 },
     button: {

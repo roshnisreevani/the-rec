@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase';
 export type UserSettings = {
   notifyGroupActivity: boolean;
   notifyBanterReplies: boolean;
-  locationPrivacyApproximate: boolean;
   allowConnectionRequests: boolean;
   isPrivate: boolean;
 };
@@ -11,7 +10,6 @@ export type UserSettings = {
 type SettingsColumn =
   | 'notify_group_activity'
   | 'notify_banter_replies'
-  | 'location_privacy_approximate'
   | 'allow_connection_requests'
   | 'is_private';
 
@@ -19,7 +17,7 @@ export async function fetchSettings(userId: string): Promise<UserSettings> {
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'notify_group_activity, notify_banter_replies, location_privacy_approximate, allow_connection_requests, is_private'
+      'notify_group_activity, notify_banter_replies, allow_connection_requests, is_private'
     )
     .eq('id', userId)
     .maybeSingle();
@@ -29,7 +27,6 @@ export async function fetchSettings(userId: string): Promise<UserSettings> {
   return {
     notifyGroupActivity: data?.notify_group_activity ?? true,
     notifyBanterReplies: data?.notify_banter_replies ?? true,
-    locationPrivacyApproximate: data?.location_privacy_approximate ?? false,
     allowConnectionRequests: data?.allow_connection_requests ?? true,
     isPrivate: data?.is_private ?? true,
   };

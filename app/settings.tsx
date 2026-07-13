@@ -142,20 +142,6 @@ export default function SettingsScreen() {
 
           <Section title="Privacy" colors={colors} styles={styles}>
             <Row
-              label="Approximate location"
-              sublabel="Show your area instead of your exact city"
-              colors={colors}
-              styles={styles}
-              right={
-                <Switch
-                  value={settings.locationPrivacyApproximate}
-                  onValueChange={() => toggle('locationPrivacyApproximate', 'location_privacy_approximate')}
-                  trackColor={{ true: colors.coral, false: colors.border }}
-                  thumbColor={ON_ACCENT}
-                />
-              }
-            />
-            <Row
               label="Allow new followers"
               sublabel="Turn off to stop new people from following you"
               colors={colors}
