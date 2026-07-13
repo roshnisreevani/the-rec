@@ -21,7 +21,6 @@ import { PinnieIcon } from '@/components/profile/pinnie-icon';
 import { QrShareModal } from '@/components/profile/qr-share-modal';
 import { SportTagsField } from '@/components/profile/sport-tags-field';
 import { TrophyCase } from '@/components/profile/trophy-case';
-import { WalkupSongRow } from '@/components/profile/walkup-song-row';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { FONTS, ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
@@ -201,7 +200,6 @@ export default function ProfileScreen() {
             </View>
           ) : null}
 
-          {profile.walkupSong ? <WalkupSongRow song={profile.walkupSong} /> : null}
         </View>
 
         {/* Stats — light rounded container, thin dividers */}
