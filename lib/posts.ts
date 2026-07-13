@@ -122,7 +122,12 @@ const POST_SELECT =
  */
 export async function fetchFeed(currentUserId: string | undefined, scope: FeedScope = 'following'): Promise<Post[]> {
   const [{ data, error }, blockedIds, followingIds] = await Promise.all([
-    supabase.from('posts').select(POST_SELECT).order('created_at', { ascending: false }),
+    // Group-scoped posts (group_id set) never appear in the general feed —
+    // they live exclusively in their group's own feed (fetchGroupPosts).
+    // RLS additionally hides them from non-members at the database (see the
+    // group_post_privacy migration); this filter is what keeps them out of
+    // members' main feeds too.
+    supabase.from('posts').select(POST_SELECT).is('group_id', null).order('created_at', { ascending: false }),
     fetchBlockedUserIds(currentUserId),
     scope === 'following' && currentUserId ? fetchFollowingIds(currentUserId) : Promise.resolve<string[]>([]),
   ]);
