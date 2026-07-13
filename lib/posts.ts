@@ -30,6 +30,7 @@ export type Comment = {
   postId: string;
   authorId: string;
   authorName: string;
+  authorAvatarUrl: string | null;
   body: string;
   createdAt: string;
 };
@@ -236,7 +237,7 @@ export async function fetchComments(postId: string, currentUserId?: string): Pro
   const [{ data, error }, blockedIds] = await Promise.all([
     supabase
       .from('post_comments')
-      .select('*, author:profiles(name)')
+      .select('*, author:profiles(name, avatar_url)')
       .eq('post_id', postId)
       .order('created_at', { ascending: true }),
     fetchBlockedUserIds(currentUserId),
@@ -252,7 +253,7 @@ export async function fetchComments(postId: string, currentUserId?: string): Pro
     author_id: string;
     body: string;
     created_at: string;
-    author: { name: string | null } | null;
+    author: { name: string | null; avatar_url: string | null } | null;
   }>)
     .filter((row) => !blocked.has(row.author_id))
     .map((row) => ({
@@ -260,6 +261,7 @@ export async function fetchComments(postId: string, currentUserId?: string): Pro
       postId: row.post_id,
       authorId: row.author_id,
       authorName: row.author?.name?.trim() || 'Nameless legend',
+      authorAvatarUrl: row.author?.avatar_url ?? null,
       body: row.body,
       createdAt: row.created_at,
     }));

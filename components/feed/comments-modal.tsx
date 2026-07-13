@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Keyboard,
   Modal,
   Platform,
@@ -15,6 +16,7 @@ import {
 } from 'react-native';
 
 import { ContentMenu } from '@/components/moderation/content-menu';
+import { InitialsAvatar } from '@/components/profile/initials-avatar';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useThemeColors } from '@/contexts/theme-context';
@@ -175,6 +177,11 @@ export function CommentsModal({
             ) : (
               comments.map((c) => (
                 <View key={c.id} style={styles.commentRow}>
+                  {c.authorAvatarUrl ? (
+                    <Image source={{ uri: c.authorAvatarUrl }} style={styles.commentAvatar} />
+                  ) : (
+                    <InitialsAvatar name={c.authorName} size={34} />
+                  )}
                   <View style={styles.commentTextWrap}>
                     <Text style={styles.commentAuthor}>{c.authorName}</Text>
                     <Text style={styles.commentBody}>{c.body}</Text>
@@ -239,7 +246,8 @@ function makeStyles(colors: ThemeColors) {
     loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     list: { padding: 16, gap: 14 },
     empty: { fontStyle: 'italic', color: colors.textSecondary, fontSize: 13 },
-    commentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    commentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    commentAvatar: { width: 34, height: 34, borderRadius: 17 },
     commentTextWrap: { flex: 1, gap: 2 },
     commentAuthor: { fontSize: 12, fontWeight: WEIGHT.semibold, color: colors.text },
     commentBody: { fontSize: 14, color: colors.text },
