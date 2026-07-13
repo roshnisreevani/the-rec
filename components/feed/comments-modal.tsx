@@ -1,5 +1,5 @@
 import { MoreHorizontal } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ContentMenu } from '@/components/moderation/content-menu';
 import { CrestAvatar } from '@/components/profile/crest-avatar';
@@ -48,6 +49,8 @@ export function CommentsModal({
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,7 +70,10 @@ export function CommentsModal({
     if (!visible) return;
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, (e) => setKeyboardHeight(e.endCoordinates.height));
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(Math.max(0, e.endCoordinates.height - insets.bottom));
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    });
     const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
     return () => {
       showSub.remove();
@@ -176,7 +182,7 @@ export function CommentsModal({
             <ActivityIndicator color={colors.text} />
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.list}>
+          <ScrollView ref={scrollRef} contentContainerStyle={styles.list}>
             {comments.length === 0 ? (
               <Text style={styles.empty}>No comments yet — say something.</Text>
             ) : (
