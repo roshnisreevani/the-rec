@@ -32,6 +32,8 @@ type Props = {
   onDelete: () => void;
   onReport: (reason: ReportReason) => void;
   onBlock: () => void;
+  // Single tap on the media (double-tap still fires 🔥).
+  onOpenPost?: () => void;
 };
 
 function timeAgo(iso: string): string {
@@ -71,24 +73,38 @@ export function SessionPostCard({
   onDelete,
   onReport,
   onBlock,
+  onOpenPost,
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const lastTap = useRef(0);
+  const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [flyKey, setFlyKey] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const isOwn = post.authorId === currentUserId;
   const hasReactedFire = post.myReactions.includes('fire');
   const showStreak = hasReactedFire && streak >= STREAK_DISPLAY_THRESHOLD;
 
+  // Single tap opens the full-screen post view; double tap fires 🔥. The
+  // single-tap action waits out the double-tap window so it never triggers
+  // on the first tap of a double.
   const handleMediaPress = () => {
     const now = Date.now();
     if (now - lastTap.current < DOUBLE_TAP_MS) {
+      if (singleTapTimer.current) {
+        clearTimeout(singleTapTimer.current);
+        singleTapTimer.current = null;
+      }
       setFlyKey((k) => k + 1);
       if (!post.myReactions.includes('fire')) {
         onToggleReaction('fire');
       }
+    } else if (onOpenPost) {
+      singleTapTimer.current = setTimeout(() => {
+        singleTapTimer.current = null;
+        onOpenPost();
+      }, DOUBLE_TAP_MS);
     }
     lastTap.current = now;
   };

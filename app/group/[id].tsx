@@ -306,6 +306,7 @@ export default function GroupDetailScreen() {
                 isPostOfWeek={post.id === postOfWeekId}
                 onToggleReaction={(type) => handleToggleReaction(post.id, type)}
                 onOpenComments={() => setCommentsPostId(post.id)}
+                onOpenPost={() => router.push(`/post/${post.id}`)}
                 onDelete={() => handleDeletePost(post)}
                 onReport={(reason) => handleReportPost(post, reason)}
                 onBlock={() => handleBlockPostAuthor(post)}
