@@ -46,6 +46,7 @@ function RootNavigator() {
             <Stack.Screen name="group/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="group/invite/[id]" options={{ headerShown: false, presentation: 'modal' }} />
             <Stack.Screen name="group/members/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="group/leaderboard/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="join/[code]" options={{ headerShown: false }} />
             <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="new-chat" options={{ headerShown: false, presentation: 'modal' }} />

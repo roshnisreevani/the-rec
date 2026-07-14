@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Check, ChevronLeft, ImagePlus, Lock, MessagesSquare, UserPlus, Users2, X } from 'lucide-react-native';
+import { Check, ChevronLeft, ImagePlus, Lock, MessagesSquare, Trophy, UserPlus, Users2, X } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -289,6 +289,12 @@ export default function GroupDetailScreen() {
             onPress={() => router.push(`/group/members/${group.id}`)}>
             <Users2 size={16} color={colors.text} strokeWidth={2} />
             <Text style={styles.banterButtonText}>Members</Text>
+          </AnimatedPressable>
+          <AnimatedPressable
+            style={[styles.banterButton, styles.actionButton]}
+            onPress={() => router.push(`/group/leaderboard/${group.id}`)}>
+            <Trophy size={16} color={colors.text} strokeWidth={2} />
+            <Text style={styles.banterButtonText}>Leaderboard</Text>
           </AnimatedPressable>
         </View>
 
