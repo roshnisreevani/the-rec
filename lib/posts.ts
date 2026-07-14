@@ -37,6 +37,7 @@ export type Comment = {
   authorName: string;
   authorAvatarUrl: string | null;
   body: string;
+  parentCommentId: string | null; // set = this is a reply to that top-level comment
   createdAt: string;
 };
 
@@ -297,33 +298,52 @@ export async function fetchComments(postId: string, currentUserId?: string): Pro
 
   const blocked = new Set(blockedIds);
 
+  // Note: the commenter column on post_comments is `user_id` (see the feed
+  // schema, its RLS policies, and addComment below).
   return ((data ?? []) as unknown as Array<{
     id: string;
     post_id: string;
-    author_id: string;
+    user_id: string;
     body: string;
+    parent_comment_id: string | null;
     created_at: string;
     author: { name: string | null; avatar_url: string | null } | null;
   }>)
-    .filter((row) => !blocked.has(row.author_id))
+    .filter((row) => !blocked.has(row.user_id))
     .map((row) => ({
       id: row.id,
       postId: row.post_id,
-      authorId: row.author_id,
+      authorId: row.user_id,
       authorName: row.author?.name?.trim() || 'Nameless legend',
       authorAvatarUrl: row.author?.avatar_url ?? null,
       body: row.body,
+      parentCommentId: row.parent_comment_id ?? null,
       createdAt: row.created_at,
     }));
 }
 
-export async function addComment(postId: string, userId: string, body: string): Promise<void> {
+export async function addComment(
+  postId: string,
+  userId: string,
+  body: string,
+  parentCommentId?: string | null
+): Promise<void> {
   const { error } = await supabase.from('post_comments').insert({
     post_id: postId,
     user_id: userId,
     body: body.trim(),
+    parent_comment_id: parentCommentId ?? null,
   });
   if (error) throw error;
+}
+
+/** One post by id — RLS decides whether the caller may see it (general posts
+ * for everyone, group posts for members). Null when missing or not visible. */
+export async function fetchPostById(postId: string, currentUserId: string | undefined): Promise<Post | null> {
+  const { data, error } = await supabase.from('posts').select(POST_SELECT).eq('id', postId).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return rowToPost(data as unknown as PostRow, currentUserId);
 }
 
 export async function deleteComment(commentId: string): Promise<void> {

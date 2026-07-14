@@ -13,6 +13,7 @@ import Animated, {
 
 import { ContentMenu } from '@/components/moderation/content-menu';
 import { FlyingReaction } from '@/components/feed/flying-reaction';
+import { PostVideo } from '@/components/feed/post-video';
 import { ReactionBar } from '@/components/feed/reaction-bar';
 import { InitialsAvatar } from '@/components/profile/initials-avatar';
 import { GOLD, ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
@@ -35,6 +36,9 @@ type Props = {
   onDelete: () => void;
   onReport: (reason: ReportReason) => void;
   onBlock: () => void;
+  // Single tap on the media (double-tap still fires 🔥). Omit where the
+  // card already IS the full-screen view.
+  onOpenPost?: () => void;
 };
 
 function timeAgo(iso: string): string {
@@ -64,11 +68,13 @@ export function PostCard({
   onDelete,
   onReport,
   onBlock,
+  onOpenPost,
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const lastTap = useRef(0);
+  const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [flyKey, setFlyKey] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const isOwn = post.authorId === currentUserId;
@@ -100,14 +106,26 @@ export function PostCard({
     );
   };
 
+  // Single tap opens the full-screen post view; double tap fires 🔥. The
+  // single-tap action waits out the double-tap window so it never triggers
+  // on the first tap of a double.
   const handleMediaPress = () => {
     const now = Date.now();
     if (now - lastTap.current < DOUBLE_TAP_MS) {
+      if (singleTapTimer.current) {
+        clearTimeout(singleTapTimer.current);
+        singleTapTimer.current = null;
+      }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setFlyKey((k) => k + 1);
       if (!post.myReactions.includes('fire')) {
         onToggleReaction('fire');
       }
+    } else if (onOpenPost) {
+      singleTapTimer.current = setTimeout(() => {
+        singleTapTimer.current = null;
+        onOpenPost();
+      }, DOUBLE_TAP_MS);
     }
     lastTap.current = now;
   };
@@ -147,9 +165,7 @@ export function PostCard({
       <Pressable onPress={handleMediaPress}>
         <View style={styles.mediaWrap}>
           {post.mediaType === 'video' ? (
-            <View style={[styles.media, styles.videoFallback]}>
-              <Text style={styles.videoFallbackText}>▶ video</Text>
-            </View>
+            <PostVideo uri={post.mediaUrl} style={styles.media} />
           ) : (
             <Image source={{ uri: post.mediaUrl }} style={styles.media} />
           )}
@@ -234,8 +250,6 @@ function makeStyles(colors: ThemeColors) {
       backgroundColor: colors.borderSoft,
     },
     media: { width: '100%', aspectRatio: 1, backgroundColor: colors.borderSoft },
-    videoFallback: { alignItems: 'center', justifyContent: 'center' },
-    videoFallbackText: { color: colors.textSecondary, fontSize: 14, fontWeight: WEIGHT.semibold },
     caption: { fontSize: 14, color: colors.text, lineHeight: 19 },
     footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     commentButton: { flexDirection: 'row', alignItems: 'center', gap: 5 },

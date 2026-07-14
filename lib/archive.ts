@@ -11,7 +11,7 @@ import type { Post } from '@/lib/posts';
 // Deliberately NOT a DB trigger: this is time-based read-time visibility,
 // not a reaction to a discrete event, so it's computed here over whatever
 // posts were just fetched rather than stored/mutated in Postgres.
-export const ARCHIVE_WINDOW_DAYS = 3;
+export const ARCHIVE_WINDOW_DAYS = 2;
 export const ARCHIVE_FLOOR_COUNT = 5;
 
 export type PostWithArchiveStatus = Post & { isArchived: boolean };

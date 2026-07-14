@@ -46,6 +46,7 @@ function RootNavigator() {
             <Stack.Screen name="group/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="group/invite/[id]" options={{ headerShown: false, presentation: 'modal' }} />
             <Stack.Screen name="group/members/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="group/leaderboard/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="join/[code]" options={{ headerShown: false }} />
             <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="new-chat" options={{ headerShown: false, presentation: 'modal' }} />
@@ -58,6 +59,8 @@ function RootNavigator() {
             <Stack.Screen name="follows" options={{ headerShown: false }} />
             <Stack.Screen name="connections" options={{ headerShown: false }} />
             <Stack.Screen name="my-groups" options={{ headerShown: false }} />
+            <Stack.Screen name="archive" options={{ headerShown: false }} />
+            <Stack.Screen name="post/[id]" options={{ headerShown: false }} />
           </Stack.Protected>
           <Stack.Protected guard={!isPasswordRecovery && !session}>
             <Stack.Screen name="auth" options={{ headerShown: false }} />

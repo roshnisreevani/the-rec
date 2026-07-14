@@ -1,6 +1,5 @@
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Video } from 'lucide-react-native';
 import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PostVideo } from '@/components/feed/post-video';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { SportPickerField } from '@/components/create-post/sport-picker-field';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
@@ -190,10 +190,7 @@ export default function CreatePostScreen() {
           <AnimatedPressable style={styles.mediaBox} onPress={handlePickMedia}>
             {media ? (
               media.type === 'video' ? (
-                <View style={styles.videoPreview}>
-                  <Video size={32} color={colors.textSecondary} strokeWidth={1.75} />
-                  <Text style={styles.videoPreviewText}>video selected</Text>
-                </View>
+                <PostVideo uri={media.uri} style={styles.mediaImage} />
               ) : (
                 <Image source={{ uri: media.uri }} style={styles.mediaImage} />
               )
@@ -297,8 +294,6 @@ function makeStyles(colors: ThemeColors) {
     },
     mediaBoxText: { color: colors.textSecondary, fontSize: 14 },
     mediaImage: { width: '100%', height: '100%' },
-    videoPreview: { alignItems: 'center', gap: 8 },
-    videoPreviewText: { color: colors.textSecondary, fontSize: 13 },
     captionInput: {
       borderWidth: 1,
       borderColor: colors.border,
