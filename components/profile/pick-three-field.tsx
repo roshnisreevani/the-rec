@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react-native';
+import { Plus, X } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { Image, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -19,6 +19,7 @@ type EditProps = {
   slots: PickThreeSlot[];
   onPickPhoto: (index: number) => void;
   onCaptionChange: (index: number, text: string) => void;
+  onRemovePhoto?: (index: number) => void;
 };
 
 type ViewProps = {
@@ -33,7 +34,7 @@ export function PickThreeField(props: Props) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   if (props.editing) {
-    const { slots, onPickPhoto, onCaptionChange } = props;
+    const { slots, onPickPhoto, onCaptionChange, onRemovePhoto } = props;
     return (
       <View style={styles.row}>
         {[0, 1, 2].map((index) => {
@@ -54,6 +55,14 @@ export function PickThreeField(props: Props) {
                   </View>
                 ) : null}
               </AnimatedPressable>
+              {slot.uri && onRemovePhoto ? (
+                <AnimatedPressable
+                  style={styles.removeBadge}
+                  hitSlop={8}
+                  onPress={() => onRemovePhoto(index)}>
+                  <X size={12} color="#FFFFFF" strokeWidth={2.5} />
+                </AnimatedPressable>
+              ) : null}
               <TextInput
                 style={styles.captionInput}
                 placeholder={PLACEHOLDER_CAPTIONS[index]}
@@ -95,7 +104,7 @@ export function PickThreeField(props: Props) {
 function makeStyles(colors: ThemeColors) {
   return StyleSheet.create({
     row: { flexDirection: 'row', gap: 10 },
-    column: { flex: 1, gap: 6 },
+    column: { flex: 1, gap: 6, position: 'relative' },
     square: {
       aspectRatio: 1,
       borderWidth: 1,
@@ -119,6 +128,17 @@ function makeStyles(colors: ThemeColors) {
       paddingVertical: 2,
     },
     changeBadgeText: { color: colors.background, fontWeight: '700', fontSize: 10 },
+    removeBadge: {
+      position: 'absolute',
+      top: 6,
+      right: 6,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     captionInput: {
       borderWidth: 1,
       borderColor: colors.border,

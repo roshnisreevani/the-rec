@@ -26,9 +26,9 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { FONTS, ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
+import { fetchActivityStreakWeeks } from '@/lib/activity-streak';
 import { fetchFollowCounts } from '@/lib/follows';
 import { fetchMyGroupsCount } from '@/lib/groups';
-import { MOCK_STREAK_WEEKS } from '@/lib/mock-stats';
 import { fetchUnreadNotificationCount } from '@/lib/notifications';
 import { fetchFeaturedPosts, type Post } from '@/lib/posts';
 import { emptyProfile, fetchProfile, saveProfile, type Profile, type Trophy } from '@/lib/profile';
@@ -52,6 +52,7 @@ export default function ProfileScreen() {
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [groupsCount, setGroupsCount] = useState(0);
   const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
+  const [streakWeeks, setStreakWeeks] = useState(0);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -87,6 +88,11 @@ export default function ProfileScreen() {
       setFeaturedPosts(await fetchFeaturedPosts(userId));
     } catch {
       // Non-critical — Featured section just stays empty if this fails.
+    }
+    try {
+      setStreakWeeks(await fetchActivityStreakWeeks(userId));
+    } catch {
+      // Non-critical — streak just stays at its last known value if this fails.
     }
   }, [userId]);
 
@@ -190,11 +196,15 @@ export default function ProfileScreen() {
             <CrestAvatar name={profile.name} photoUri={profile.avatarUrl} size={155} />
           </AnimatedPressable>
 
-          {/* Streak counter — mock until real attendance tracking exists */}
-          <View style={styles.streakPill}>
-            <Flame size={14} color={colors.coral} strokeWidth={2} fill={colors.coral} />
-            <Text style={styles.streakText}>{MOCK_STREAK_WEEKS}-week streak</Text>
-          </View>
+          {/* Streak counter — consecutive weeks with any app activity (see
+              lib/activity-streak.ts). Hidden below 1 week rather than showing
+              a deflating "0-week streak" to brand-new or inactive users. */}
+          {streakWeeks > 0 ? (
+            <View style={styles.streakPill}>
+              <Flame size={14} color={colors.coral} strokeWidth={2} fill={colors.coral} />
+              <Text style={styles.streakText}>{streakWeeks}-week streak</Text>
+            </View>
+          ) : null}
 
           <Text style={styles.name} numberOfLines={1}>
             {profile.name || 'Nameless legend'}

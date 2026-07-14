@@ -22,6 +22,7 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
+import { errorMessage } from '@/lib/error-message';
 import {
   fetchGroupDetail,
   fetchOrCreateInviteCode,
@@ -72,7 +73,7 @@ export default function GroupInviteScreen() {
         const memberIds = (detail?.members ?? []).map((m) => m.userId);
         setExcludedIds([...memberIds, ...pendingInviteIds, userId]);
       } catch (e) {
-        if (!cancelled) Alert.alert('Could not load invite link', e instanceof Error ? e.message : 'Unknown error.');
+        if (!cancelled) Alert.alert('Could not load invite link', errorMessage(e));
       } finally {
         if (!cancelled) setLoadingLink(false);
       }
@@ -92,7 +93,7 @@ export default function GroupInviteScreen() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (e) {
-      Alert.alert('Could not copy link', e instanceof Error ? e.message : 'Unknown error.');
+      Alert.alert('Could not copy link', errorMessage(e));
     }
   };
 
@@ -101,7 +102,7 @@ export default function GroupInviteScreen() {
     try {
       await Share.share({ message: `Join ${groupName || 'my group'} on The Rec: ${inviteUrl}` });
     } catch (e) {
-      Alert.alert('Could not share link', e instanceof Error ? e.message : 'Unknown error.');
+      Alert.alert('Could not share link', errorMessage(e));
     }
   };
 
@@ -117,7 +118,7 @@ export default function GroupInviteScreen() {
             const code = await regenerateInviteCode(id);
             setInviteCode(code);
           } catch (e) {
-            Alert.alert('Could not regenerate link', e instanceof Error ? e.message : 'Unknown error.');
+            Alert.alert('Could not regenerate link', errorMessage(e));
           } finally {
             setRegenerating(false);
           }
@@ -137,7 +138,7 @@ export default function GroupInviteScreen() {
         const people = await searchUsersToInvite(text, excludedIds);
         setResults(people);
       } catch (e) {
-        Alert.alert('Search failed', e instanceof Error ? e.message : 'Unknown error.');
+        Alert.alert('Search failed', errorMessage(e));
       } finally {
         setSearching(false);
       }
@@ -158,7 +159,7 @@ export default function GroupInviteScreen() {
       setInviteStatus((prev) => ({ ...prev, [person.id]: 'sent' }));
     } catch (e) {
       setInviteStatus((prev) => ({ ...prev, [person.id]: 'error' }));
-      Alert.alert('Could not send invite', e instanceof Error ? e.message : 'Unknown error.');
+      Alert.alert('Could not send invite', errorMessage(e));
     }
   };
 

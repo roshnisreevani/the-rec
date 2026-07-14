@@ -2,6 +2,7 @@ import type { Session } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { recordActivityToday } from '@/lib/activity-streak';
 import { supabase } from '@/lib/supabase';
 
 type AuthResult = { error: string | null };
@@ -70,6 +71,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       urlSub.remove();
     };
   }, []);
+
+  // Log today as an "active day" for the streak (see lib/activity-streak.ts)
+  // whenever a signed-in session is present — covers cold start, foreground
+  // resume, and sign-in alike. Upserted server-side, so this firing more than
+  // once a day is harmless.
+  useEffect(() => {
+    if (session?.user.id) {
+      recordActivityToday(session.user.id);
+    }
+  }, [session?.user.id]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

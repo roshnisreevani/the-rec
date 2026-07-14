@@ -1,25 +1,6 @@
-<<<<<<< HEAD
-import { MoreHorizontal } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Keyboard,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-=======
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Keyboard, Modal, Platform, StyleSheet, Text, View } from 'react-native';
->>>>>>> 0901838564f875f484ad55f9aca7213ff419d895
 
 import { CommentsSection } from '@/components/feed/comments-section';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -57,17 +38,6 @@ export function CommentsModal({
   const router = useRouter();
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-<<<<<<< HEAD
-  const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ScrollView>(null);
-
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [body, setBody] = useState('');
-  const [sending, setSending] = useState(false);
-  const [menuComment, setMenuComment] = useState<Comment | null>(null);
-=======
->>>>>>> 0901838564f875f484ad55f9aca7213ff419d895
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // KeyboardAvoidingView doesn't work reliably here: this UI lives inside a
@@ -82,8 +52,7 @@ export function CommentsModal({
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e) => {
-      setKeyboardHeight(Math.max(0, e.endCoordinates.height - insets.bottom));
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+      setKeyboardHeight(e.endCoordinates.height);
     });
     const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
     return () => {
@@ -108,43 +77,6 @@ export function CommentsModal({
           </AnimatedPressable>
         </View>
 
-<<<<<<< HEAD
-        {loading ? (
-          <View style={styles.loading}>
-            <ActivityIndicator color={colors.text} />
-          </View>
-        ) : (
-          <ScrollView ref={scrollRef} contentContainerStyle={styles.list}>
-            {comments.length === 0 ? (
-              <Text style={styles.empty}>No comments yet — say something.</Text>
-            ) : (
-              comments.map((c) => (
-                  <View key={c.id} style={styles.commentRow}>
-                    <CrestAvatar name={c.authorName} photoUri={c.authorAvatarUrl} size={44} />
-                    <View style={styles.commentTextWrap}>
-                      <Text style={styles.commentInline}>
-                        <Text style={styles.commentAuthor}>{c.authorName} </Text>
-                        <Text style={styles.commentBody}>{c.body}</Text>
-                      </Text>
-                    </View>
-                    <Pressable hitSlop={12} onPress={() => setMenuComment(c)} style={styles.moreBtn}>
-                      <MoreHorizontal size={18} color={colors.textSecondary} strokeWidth={1.75} />
-                    </Pressable>
-                  </View>
-              ))
-            )}
-          </ScrollView>
-        )}
-
-        <View style={styles.composer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Add a comment…"
-            placeholderTextColor={colors.textSecondary}
-            value={body}
-            onChangeText={setBody}
-            multiline
-=======
         {visible && postId ? (
           <CommentsSection
             postId={postId}
@@ -157,7 +89,6 @@ export function CommentsModal({
               onClose();
               router.push(`/user/${profileUserId}`);
             }}
->>>>>>> 0901838564f875f484ad55f9aca7213ff419d895
           />
         ) : null}
       </View>

@@ -117,6 +117,14 @@ export default function EditProfileScreen() {
     setSlots((prev) => prev.map((slot, i) => (i === index ? { uri, caption: slot.caption } : slot)));
   };
 
+  const handleRemovePhoto = (index: number) => {
+    setSlots((prev) => prev.map((slot, i) => (i === index ? { uri: null, caption: '' } : slot)));
+  };
+
+  const handleRemoveAvatar = () => {
+    setAvatarUri(null);
+  };
+
   const handleCaptionChange = (index: number, text: string) => {
     setSlots((prev) => prev.map((slot, i) => (i === index ? { ...slot, caption: text } : slot)));
   };
@@ -201,6 +209,11 @@ export default function EditProfileScreen() {
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.avatarRow}>
           <ProfileAvatar name={name} photoUri={avatarUri} editable onPress={handlePickAvatar} size={84} />
+          {avatarUri ? (
+            <AnimatedPressable onPress={handleRemoveAvatar} hitSlop={8}>
+              <Text style={styles.removeAvatarText}>Remove photo</Text>
+            </AnimatedPressable>
+          ) : null}
         </View>
 
         <Section title="Name" styles={styles}>
@@ -256,7 +269,13 @@ export default function EditProfileScreen() {
         </Section>
 
         <Section title="Pick your 3" styles={styles}>
-          <PickThreeField editing slots={slots} onPickPhoto={handlePickPhoto} onCaptionChange={handleCaptionChange} />
+          <PickThreeField
+            editing
+            slots={slots}
+            onPickPhoto={handlePickPhoto}
+            onCaptionChange={handleCaptionChange}
+            onRemovePhoto={handleRemovePhoto}
+          />
         </Section>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -306,7 +325,8 @@ function makeStyles(colors: ThemeColors) {
     },
     saveButtonText: { fontWeight: WEIGHT.bold, color: ON_ACCENT, fontSize: 14 },
     content: { padding: 20, paddingBottom: 60, gap: 4 },
-    avatarRow: { alignItems: 'center', marginBottom: 8 },
+    avatarRow: { alignItems: 'center', marginBottom: 8, gap: 8 },
+    removeAvatarText: { fontSize: 13, color: colors.danger, fontWeight: WEIGHT.medium },
     section: { marginTop: 22, gap: 8 },
     sectionTitle: { fontSize: 13, fontWeight: WEIGHT.bold, color: colors.text },
     input: {
