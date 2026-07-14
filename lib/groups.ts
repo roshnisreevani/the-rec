@@ -1,3 +1,5 @@
+import * as Linking from 'expo-linking';
+
 import { supabase } from '@/lib/supabase';
 
 export type GroupType = 'friend_group' | 'team' | 'pickup_group' | 'league';
@@ -297,7 +299,7 @@ export async function deleteGroup(groupId: string): Promise<void> {
 }
 
 export function getGroupInviteUrl(code: string): string {
-  return `https://therec.app/join/${code}`;
+  return Linking.createURL('join/' + code);
 }
 
 /**
