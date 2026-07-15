@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CommentsSection } from '@/components/feed/comments-section';
 import { PostCard } from '@/components/feed/post-card';
+import { PennyRatingDisplay } from '@/components/feed/penny-rating';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { FONTS, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
@@ -188,6 +189,14 @@ export default function PostDetailScreen() {
                   onBlock={handleBlock}
                   onReshare={handleReshare}
                 />
+                {post.selfRating ? (
+                  <View style={styles.ratingWrap}>
+                    <Text style={[styles.ratingLabel, { color: colors.textSecondary }]}>
+                      Post-game rating
+                    </Text>
+                    <PennyRatingDisplay rating={post.selfRating} />
+                  </View>
+                ) : null}
               </View>
             }
           />
@@ -212,5 +221,16 @@ function makeStyles(colors: ThemeColors) {
     },
     headerTitle: { fontSize: 16, fontFamily: FONTS.displaySemibold, color: colors.text },
     cardWrap: { marginBottom: 6 },
+    ratingWrap: {
+      marginTop: 4,
+      marginBottom: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      gap: 8,
+    },
+    ratingLabel: { fontSize: 12, fontFamily: FONTS.displaySemibold },
   });
 }

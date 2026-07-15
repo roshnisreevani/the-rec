@@ -63,6 +63,9 @@ function RootNavigator() {
             <Stack.Screen name="archive" options={{ headerShown: false }} />
             <Stack.Screen name="saved-posts" options={{ headerShown: false }} />
             <Stack.Screen name="post/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="group/brackets/[groupId]" options={{ headerShown: false }} />
+            <Stack.Screen name="group/brackets/create/[groupId]" options={{ headerShown: false }} />
+            <Stack.Screen name="group/brackets/detail/[bracketId]" options={{ headerShown: false }} />
           </Stack.Protected>
           <Stack.Protected guard={!isPasswordRecovery && !session}>
             <Stack.Screen name="auth" options={{ headerShown: false }} />

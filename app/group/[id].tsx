@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Calendar, Check, ChevronLeft, ImagePlus, Lock, MessagesSquare, Trophy, UserPlus, Users2, X } from 'lucide-react-native';
+import { Calendar, Check, ChevronLeft, ImagePlus, Lock, MessagesSquare, Swords, Trophy, UserPlus, Users2, X } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -313,6 +313,12 @@ export default function GroupDetailScreen() {
             onPress={() => router.push(`/group/gameday/${group.id}`)}>
             <Calendar size={16} color={colors.text} strokeWidth={2} />
             <Text style={styles.banterButtonText}>Game Day</Text>
+          </AnimatedPressable>
+          <AnimatedPressable
+            style={[styles.banterButton, styles.actionButton]}
+            onPress={() => router.push(`/group/brackets/${group.id}`)}>
+            <Swords size={16} color={colors.text} strokeWidth={2} />
+            <Text style={styles.banterButtonText}>Brackets</Text>
           </AnimatedPressable>
         </View>
 
