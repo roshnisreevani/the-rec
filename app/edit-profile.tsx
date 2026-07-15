@@ -22,9 +22,10 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
+import { errorMessage } from '@/lib/error-message';
 import type { ItunesTrack } from '@/lib/itunes';
 import { pickPhoto } from '@/lib/pick-photo';
-import { emptyProfile, fetchProfile, saveProfile, type Profile } from '@/lib/profile';
+import { fetchProfile, saveProfile, type Profile, type Trophy } from '@/lib/profile';
 import { ROAST_LINES } from '@/lib/roast-lines';
 import type { SportTag } from '@/lib/sports';
 import { uploadAvatarPhoto, uploadPickThreePhoto } from '@/lib/upload-photo';
@@ -52,6 +53,10 @@ export default function EditProfileScreen() {
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [song, setSong] = useState<Profile['walkupSong']>(null);
   const [slots, setSlots] = useState<PickThreeSlot[]>(EMPTY_SLOTS);
+  // Trophy Case UI no longer exists anywhere, but `trophies` is still a real
+  // column on the profile row — carried through from the initial load so
+  // saving here never wipes out (or requires a redundant re-fetch of) it.
+  const [trophies, setTrophies] = useState<Trophy[]>([]);
   const lastRoastIndex = useRef<number | null>(null);
 
   const load = useCallback(async () => {
@@ -70,8 +75,9 @@ export default function EditProfileScreen() {
         return item ? { uri: item.url, caption: item.caption } : { uri: null, caption: '' };
       });
       setSlots(nextSlots);
+      setTrophies(profile.trophies);
     } catch (e) {
-      Alert.alert('Could not load your profile', e instanceof Error ? e.message : 'Unknown error.');
+      Alert.alert('Could not load your profile', errorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -153,10 +159,6 @@ export default function EditProfileScreen() {
         })
       );
 
-      // Trophy case isn't touched here — it's added/removed straight from the
-      // view screen, so we need the current value to avoid clobbering it.
-      const current = await fetchProfile(userId).catch(() => emptyProfile(userId));
-
       const updated: Profile = {
         id: userId,
         name: name.trim(),
@@ -166,13 +168,13 @@ export default function EditProfileScreen() {
         avatarUrl,
         walkupSong: song,
         pickThree: uploaded.filter((item): item is { url: string; caption: string } => item !== null),
-        trophies: current.trophies,
+        trophies,
       };
 
       await saveProfile(updated);
       router.back();
     } catch (e) {
-      Alert.alert('Save failed', e instanceof Error ? e.message : 'Something went sideways.');
+      Alert.alert('Save failed', errorMessage(e, 'Something went sideways.'));
     } finally {
       setSaving(false);
     }

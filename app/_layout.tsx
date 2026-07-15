@@ -61,6 +61,7 @@ function RootNavigator() {
             <Stack.Screen name="connections" options={{ headerShown: false }} />
             <Stack.Screen name="my-groups" options={{ headerShown: false }} />
             <Stack.Screen name="archive" options={{ headerShown: false }} />
+            <Stack.Screen name="saved-posts" options={{ headerShown: false }} />
             <Stack.Screen name="post/[id]" options={{ headerShown: false }} />
           </Stack.Protected>
           <Stack.Protected guard={!isPasswordRecovery && !session}>

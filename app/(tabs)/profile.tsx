@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Archive, Bell, Flame, MapPin, Settings, Users, X } from 'lucide-react-native';
+import { Archive, Bell, Bookmark, Flame, MapPin, Settings, Users, X } from 'lucide-react-native';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -20,22 +20,18 @@ import { PickThreeField } from '@/components/profile/pick-three-field';
 import { PinnieIcon } from '@/components/profile/pinnie-icon';
 import { QrShareModal } from '@/components/profile/qr-share-modal';
 import { SportTagsField } from '@/components/profile/sport-tags-field';
-import { TrophyCase } from '@/components/profile/trophy-case';
 import { PostThumbnailGrid } from '@/components/feed/post-thumbnail-grid';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { FONTS, ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { fetchActivityStreakWeeks } from '@/lib/activity-streak';
+import { errorMessage } from '@/lib/error-message';
 import { fetchFollowCounts } from '@/lib/follows';
 import { fetchMyGroupsCount } from '@/lib/groups';
 import { fetchUnreadNotificationCount } from '@/lib/notifications';
 import { fetchFeaturedPosts, type Post } from '@/lib/posts';
-import { emptyProfile, fetchProfile, saveProfile, type Profile, type Trophy } from '@/lib/profile';
-
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
+import { emptyProfile, fetchProfile, type Profile } from '@/lib/profile';
 
 export default function ProfileScreen() {
   const { session } = useAuth();
@@ -56,44 +52,36 @@ export default function ProfileScreen() {
 
   const load = useCallback(async () => {
     if (!userId) return;
-    try {
-      const fetched = await fetchProfile(userId);
-      setProfile(fetched);
-    } catch (e) {
-      Alert.alert('Could not load your profile', e instanceof Error ? e.message : 'Unknown error.');
-      setProfile(emptyProfile(userId));
-    } finally {
-      setLoading(false);
-    }
 
-    // Drives the small badge on the bell icon — non-fatal: the badge just
-    // stays at its last known value if this fails.
-    try {
-      setUnreadNotificationsCount(await fetchUnreadNotificationCount(userId));
-    } catch {
-      // Non-critical.
+    // All six independent — fired together instead of one-by-one, so the
+    // screen is ready after the slowest single request rather than the sum
+    // of all of them. allSettled (not all) because the profile itself is the
+    // only fatal one; a badge/count/streak failing shouldn't block the rest.
+    const [profileResult, notifResult, followResult, groupsResult, featuredResult, streakResult] =
+      await Promise.allSettled([
+        fetchProfile(userId),
+        fetchUnreadNotificationCount(userId),
+        fetchFollowCounts(userId),
+        fetchMyGroupsCount(userId),
+        fetchFeaturedPosts(userId),
+        fetchActivityStreakWeeks(userId),
+      ]);
+
+    if (profileResult.status === 'fulfilled') {
+      setProfile(profileResult.value);
+    } else {
+      Alert.alert('Could not load your profile', errorMessage(profileResult.reason));
+      setProfile(emptyProfile(userId));
     }
-    // Stat-row counts — same non-fatal treatment as the badges above.
-    try {
-      setFollowCounts(await fetchFollowCounts(userId));
-    } catch {
-      // Non-critical.
-    }
-    try {
-      setGroupsCount(await fetchMyGroupsCount(userId));
-    } catch {
-      // Non-critical.
-    }
-    try {
-      setFeaturedPosts(await fetchFeaturedPosts(userId));
-    } catch {
-      // Non-critical — Featured section just stays empty if this fails.
-    }
-    try {
-      setStreakWeeks(await fetchActivityStreakWeeks(userId));
-    } catch {
-      // Non-critical — streak just stays at its last known value if this fails.
-    }
+    setLoading(false);
+
+    // The rest are non-critical — each just keeps its last known value (or
+    // its default) if its own fetch failed, without an alert per one.
+    if (notifResult.status === 'fulfilled') setUnreadNotificationsCount(notifResult.value);
+    if (followResult.status === 'fulfilled') setFollowCounts(followResult.value);
+    if (groupsResult.status === 'fulfilled') setGroupsCount(groupsResult.value);
+    if (featuredResult.status === 'fulfilled') setFeaturedPosts(featuredResult.value);
+    if (streakResult.status === 'fulfilled') setStreakWeeks(streakResult.value);
   }, [userId]);
 
   // Reload every time this tab gains focus, so edits made on the Edit Profile
@@ -103,54 +91,6 @@ export default function ProfileScreen() {
       load();
     }, [load])
   );
-
-  // Exactly one trophy can be "legendary" at a time — marking a new one
-  // automatically clears the flag from whichever trophy had it before.
-  const withLegendaryEnforced = (trophies: Trophy[], legendaryId: string | null): Trophy[] =>
-    trophies.map((t) => ({ ...t, legendary: legendaryId !== null && t.id === legendaryId }));
-
-  const handleAddTrophy = async (trophy: Omit<Trophy, 'id'>) => {
-    if (!profile) return;
-    const id = generateId();
-    const added: Trophy = { ...trophy, id };
-    const nextTrophies = trophy.legendary
-      ? withLegendaryEnforced([...profile.trophies, added], id)
-      : [...profile.trophies, added];
-    const next: Profile = { ...profile, trophies: nextTrophies };
-    setProfile(next);
-    try {
-      await saveProfile(next);
-    } catch (e) {
-      setProfile(profile);
-      Alert.alert('Could not add trophy', e instanceof Error ? e.message : 'Unknown error.');
-    }
-  };
-
-  const handleUpdateTrophy = async (trophy: Trophy) => {
-    if (!profile) return;
-    const merged = profile.trophies.map((t) => (t.id === trophy.id ? trophy : t));
-    const nextTrophies = trophy.legendary ? withLegendaryEnforced(merged, trophy.id) : merged;
-    const next: Profile = { ...profile, trophies: nextTrophies };
-    setProfile(next);
-    try {
-      await saveProfile(next);
-    } catch (e) {
-      setProfile(profile);
-      Alert.alert('Could not update trophy', e instanceof Error ? e.message : 'Unknown error.');
-    }
-  };
-
-  const handleRemoveTrophy = async (id: string) => {
-    if (!profile) return;
-    const next: Profile = { ...profile, trophies: profile.trophies.filter((t) => t.id !== id) };
-    setProfile(next);
-    try {
-      await saveProfile(next);
-    } catch (e) {
-      setProfile(profile);
-      Alert.alert('Could not remove trophy', e instanceof Error ? e.message : 'Unknown error.');
-    }
-  };
 
   const handleShare = () => {
     setShareOpen(true);
@@ -177,6 +117,9 @@ export default function ProfileScreen() {
             </AnimatedPressable>
             <AnimatedPressable hitSlop={8} onPress={() => router.push('/archive')}>
               <Archive size={22} color={colors.text} strokeWidth={1.75} />
+            </AnimatedPressable>
+            <AnimatedPressable hitSlop={8} onPress={() => router.push('/saved-posts')}>
+              <Bookmark size={22} color={colors.text} strokeWidth={1.75} />
             </AnimatedPressable>
             <AnimatedPressable hitSlop={8} onPress={() => router.push('/notifications')} style={styles.iconWrap}>
               <Bell size={22} color={colors.text} strokeWidth={1.75} />

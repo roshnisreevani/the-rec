@@ -9,7 +9,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,12 +23,7 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
-import {
-  fetchAllowsConnectionRequests,
-  fetchConnectionNote,
-  fetchIsPrivate,
-  saveConnectionNote,
-} from '@/lib/connections';
+import { fetchAllowsConnectionRequests, fetchIsPrivate } from '@/lib/connections';
 import {
   fetchFollowState,
   fetchMutualFollowsCount,
@@ -62,8 +56,6 @@ export default function UserProfileScreen() {
   const [allowsRequests, setAllowsRequests] = useState(true);
   const [isPrivate, setIsPrivate] = useState(true);
   const [mutualCount, setMutualCount] = useState(0);
-  const [note, setNote] = useState('');
-  const [noteSaving, setNoteSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -114,14 +106,6 @@ export default function UserProfileScreen() {
         setMutualCount(0);
       }
 
-      if (state.iFollow && state.followsMe) {
-        try {
-          const existingNote = await fetchConnectionNote(currentUserId, id);
-          setNote(existingNote.note);
-        } catch {
-          // Non-critical — the note field just stays blank if this fails.
-        }
-      }
     } catch (e) {
       Alert.alert('Could not load this profile', e instanceof Error ? e.message : 'Unknown error.');
     } finally {
@@ -134,18 +118,6 @@ export default function UserProfileScreen() {
       load();
     }, [load])
   );
-
-  const handleSaveNote = async () => {
-    if (!currentUserId || !id) return;
-    setNoteSaving(true);
-    try {
-      await saveConnectionNote(currentUserId, id, note);
-    } catch (e) {
-      Alert.alert('Could not save note', e instanceof Error ? e.message : 'Unknown error.');
-    } finally {
-      setNoteSaving(false);
-    }
-  };
 
   const handleFollow = async () => {
     if (!currentUserId || !id) return;
@@ -328,21 +300,6 @@ export default function UserProfileScreen() {
           </>
         ) : null}
 
-        {isMutual ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Private note (only visible to you)</Text>
-            <TextInput
-              style={styles.noteInput}
-              placeholder="e.g. guards me every game"
-              placeholderTextColor={colors.textSecondary}
-              value={note}
-              onChangeText={setNote}
-              onBlur={handleSaveNote}
-              multiline
-            />
-            {noteSaving ? <ActivityIndicator color={colors.textSecondary} size="small" /> : null}
-          </View>
-        ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -398,16 +355,6 @@ function makeStyles(colors: ThemeColors) {
     location: { marginTop: 14, fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
     bio: { marginTop: 8, fontSize: 15, fontStyle: 'italic', color: colors.text, textAlign: 'center' },
     placeholderText: { color: colors.textSecondary },
-    noteInput: {
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: RADII.md,
-      padding: 12,
-      fontSize: 14,
-      color: colors.text,
-      minHeight: 60,
-      textAlignVertical: 'top',
-    },
     actionRow: { marginTop: 18, alignItems: 'center' },
     followsYouText: { marginTop: 8, fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
     primaryButton: {
