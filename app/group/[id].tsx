@@ -239,7 +239,14 @@ export default function GroupDetailScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {group.name}
         </Text>
-        <View style={{ width: 26 }} />
+        <View style={styles.headerIcons}>
+          <AnimatedPressable onPress={() => router.push(`/group/invite/${group.id}`)} hitSlop={8}>
+            <UserPlus size={22} color={colors.text} strokeWidth={1.75} />
+          </AnimatedPressable>
+          <AnimatedPressable onPress={() => router.push(`/group/members/${group.id}`)} hitSlop={8}>
+            <Users2 size={22} color={colors.text} strokeWidth={1.75} />
+          </AnimatedPressable>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -273,12 +280,6 @@ export default function GroupDetailScreen() {
 
         <View style={styles.actionRow}>
           <AnimatedPressable
-            style={[styles.inviteButton, styles.actionButton]}
-            onPress={() => router.push(`/group/invite/${group.id}`)}>
-            <UserPlus size={16} color={ON_ACCENT} strokeWidth={2} />
-            <Text style={styles.inviteButtonText}>Invite</Text>
-          </AnimatedPressable>
-          <AnimatedPressable
             style={[styles.banterButton, styles.actionButton]}
             onPress={async () => {
               try {
@@ -300,12 +301,6 @@ export default function GroupDetailScreen() {
             onPress={() => router.push(`/create-post?groupId=${group.id}`)}>
             <ImagePlus size={16} color={colors.text} strokeWidth={2} />
             <Text style={styles.banterButtonText}>Post</Text>
-          </AnimatedPressable>
-          <AnimatedPressable
-            style={[styles.banterButton, styles.actionButton]}
-            onPress={() => router.push(`/group/members/${group.id}`)}>
-            <Users2 size={16} color={colors.text} strokeWidth={2} />
-            <Text style={styles.banterButtonText}>Members</Text>
           </AnimatedPressable>
           <AnimatedPressable
             style={[styles.banterButton, styles.actionButton]}
@@ -419,6 +414,7 @@ function makeStyles(colors: ThemeColors) {
       borderBottomColor: colors.border,
     },
     headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: WEIGHT.bold, color: colors.text },
+    headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 14 },
     content: { padding: 20, paddingBottom: 60, gap: 4 },
     avatarRow: { alignItems: 'center', marginBottom: 16 },
     groupAvatar: { width: 72, height: 72, borderRadius: 36 },
@@ -434,19 +430,10 @@ function makeStyles(colors: ThemeColors) {
     metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     metaText: { fontSize: 12, color: colors.textSecondary },
     description: { fontSize: 14, color: colors.text, marginTop: 12, lineHeight: 20 },
-    // 2×2 grid — four equal actions (Invite/Banter on top, Post/Members below).
+    // 2×2 grid — Banter/Post on top, Leaderboard/Game Day below (Invite and
+    // Members moved up into the header as icon buttons).
     actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18 },
     actionButton: { flexBasis: '47%', flexGrow: 1 },
-    inviteButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      backgroundColor: colors.coral,
-      borderRadius: RADII.md,
-      paddingVertical: 12,
-    },
-    inviteButtonText: { color: ON_ACCENT, fontWeight: WEIGHT.semibold, fontSize: 14 },
     banterButton: {
       flexDirection: 'row',
       alignItems: 'center',
