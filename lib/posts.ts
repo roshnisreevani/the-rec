@@ -32,6 +32,9 @@ export type Post = {
   // taken at reshare time so it still reads correctly even if that account
   // is later renamed or deleted. Null for an original (non-reshared) post.
   resharedFromAuthorName: string | null;
+  // Self-rating (1–5) set by the author at post time. Null = not rated.
+  // The app hides this from the author themselves — everyone else sees it.
+  selfRating: number | null;
 };
 
 export type Comment = {
@@ -59,6 +62,7 @@ type PostRow = {
   created_at: string;
   archived_at: string | null;
   reshared_from_author_name: string | null;
+  self_rating: number | null;
   author: { name: string | null; avatar_url: string | null } | null;
   reactions: ReactionRow[] | null;
   comments: CommentCountRow[] | null;
@@ -108,6 +112,7 @@ function rowToPost(row: PostRow, currentUserId: string | undefined): Post {
     myReactions,
     commentCount: row.comments?.[0]?.count ?? 0,
     resharedFromAuthorName: row.reshared_from_author_name,
+    selfRating: row.self_rating ?? null,
   };
 }
 
@@ -270,6 +275,7 @@ export async function createPost(input: {
   caption: string;
   localMediaUri: string;
   mediaType: MediaType;
+  selfRating?: number | null;
 }): Promise<void> {
   const mediaUrl = await uploadFeedMedia(input.authorId, input.localMediaUri, input.mediaType);
 
@@ -280,6 +286,7 @@ export async function createPost(input: {
     caption: input.caption,
     media_url: mediaUrl,
     media_type: input.mediaType,
+    self_rating: input.selfRating ?? null,
   });
 
   if (error) throw error;

@@ -1,27 +1,32 @@
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Image,
   KeyboardAvoidingView,
+  NativeSyntheticEvent,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TextInputSelectionChangeEventData,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PostVideo } from '@/components/feed/post-video';
+import { PennyRatingSelector } from '@/components/feed/penny-rating';
+import { MentionSuggestions } from '@/components/create-post/mention-suggestions';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { SportPickerField } from '@/components/create-post/sport-picker-field';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
+import { fetchFollowers, type FollowUser } from '@/lib/follows';
 import { pickMedia } from '@/lib/pick-photo';
 import { type SportTag } from '@/lib/sports';
 import { createPost, type MediaType } from '@/lib/posts';
@@ -110,6 +115,45 @@ export default function CreatePostScreen() {
   const [caption, setCaption] = useState('');
   const [posting, setPosting] = useState(false);
   const [sportTag, setSportTag] = useState<SportTag | null>(null);
+  const [selfRating, setSelfRating] = useState<number | null>(null);
+
+  // Mention state
+  const [followers, setFollowers] = useState<FollowUser[]>([]);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [cursorPos, setCursorPos] = useState(0);
+  const captionRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    fetchFollowers(userId).then(setFollowers).catch(() => {});
+  }, [userId]);
+
+  const mentionSuggestions = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    return followers.filter((f) => f.name.toLowerCase().includes(q)).slice(0, 5);
+  }, [mentionQuery, followers]);
+
+  const handleCaptionChange = (text: string) => {
+    setCaption(text);
+    // Find the @word at the current cursor position
+    const before = text.slice(0, cursorPos);
+    const match = before.match(/@(\w*)$/);
+    setMentionQuery(match ? match[1] : null);
+  };
+
+  const handleSelectionChange = (e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
+    setCursorPos(e.nativeEvent.selection.start);
+  };
+
+  const handleMentionSelect = (user: FollowUser) => {
+    // Replace the @partial with @fullname and a trailing space
+    const before = caption.slice(0, cursorPos);
+    const after = caption.slice(cursorPos);
+    const replaced = before.replace(/@\w*$/, `@${user.name} `);
+    setCaption(replaced + after);
+    setMentionQuery(null);
+  };
 
   const shakeX = useRef(new Animated.Value(0)).current;
   const rotate = useRef(new Animated.Value(0)).current;
@@ -141,6 +185,7 @@ export default function CreatePostScreen() {
         caption: caption.trim(),
         localMediaUri: media.uri,
         mediaType: media.type,
+        selfRating,
       });
       router.back();
     } catch (e) {
@@ -202,13 +247,24 @@ export default function CreatePostScreen() {
           <SportPickerField value={sportTag} onChange={setSportTag} />
 
           <TextInput
+            ref={captionRef}
             style={styles.captionInput}
-            placeholder="What happened out there?"
+            placeholder="What happened out there? Use @ to tag someone"
             placeholderTextColor={colors.textSecondary}
             value={caption}
-            onChangeText={setCaption}
+            onChangeText={handleCaptionChange}
+            onSelectionChange={handleSelectionChange}
             multiline
           />
+
+          {mentionSuggestions.length > 0 ? (
+            <MentionSuggestions
+              suggestions={mentionSuggestions}
+              onSelect={handleMentionSelect}
+            />
+          ) : null}
+
+          <PennyRatingSelector value={selfRating} onChange={setSelfRating} />
 
         </ScrollView>
         </KeyboardAvoidingView>

@@ -13,6 +13,7 @@ import Animated, {
 
 import { ContentMenu } from '@/components/moderation/content-menu';
 import { FlyingReaction } from '@/components/feed/flying-reaction';
+import { PennyRatingDisplay } from '@/components/feed/penny-rating';
 import { PostVideo } from '@/components/feed/post-video';
 import { ReactionBar } from '@/components/feed/reaction-bar';
 import { ShareSheet } from '@/components/feed/share-sheet';
@@ -181,6 +182,10 @@ export function PostCard({
       </Pressable>
 
       {post.caption ? <Text style={styles.caption}>{post.caption}</Text> : null}
+
+      {post.selfRating ? (
+        <PennyRatingDisplay rating={post.selfRating} />
+      ) : null}
 
       <View style={styles.footer}>
         <ReactionBar
