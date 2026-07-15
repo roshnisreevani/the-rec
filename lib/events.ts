@@ -156,6 +156,76 @@ export async function fetchGroupEvents(groupId: string, userId: string): Promise
   return [...upcoming, ...concluded];
 }
 
+export type UpcomingEvent = {
+  id: string;
+  groupId: string;
+  groupName: string;
+  title: string;
+  sport: string | null;
+  eventDate: string;
+  attendingCount: number;
+  myStatus: RsvpStatus;
+};
+
+type MyRsvpRow = {
+  status: RsvpStatus;
+  event: {
+    id: string;
+    group_id: string;
+    title: string;
+    sport: string | null;
+    event_date: string;
+    group: { name: string } | null;
+  } | null;
+};
+
+/**
+ * Every upcoming game the user has RSVP'd "attending" to, across all of
+ * their groups — powers the Profile "Upcoming" section. Attending-only
+ * (declined RSVPs aren't a game you're planning to show up to), soonest
+ * first. RLS restricts this to the user's own RSVP rows either way.
+ */
+export async function fetchMyUpcomingEvents(userId: string): Promise<UpcomingEvent[]> {
+  const { data, error } = await supabase
+    .from('group_event_rsvps')
+    .select(
+      'status, event:group_events!group_event_rsvps_event_id_fkey(id, group_id, title, sport, event_date, group:groups(name))'
+    )
+    .eq('user_id', userId)
+    .eq('status', 'attending');
+
+  if (error) throw error;
+  const rows = (data ?? []) as unknown as MyRsvpRow[];
+
+  const eventIds = rows.map((r) => r.event?.id).filter((id): id is string => !!id);
+  let counts = new Map<string, number>();
+  if (eventIds.length > 0) {
+    const { data: rsvpRows, error: countError } = await supabase
+      .from('group_event_rsvps')
+      .select('event_id')
+      .in('event_id', eventIds)
+      .eq('status', 'attending');
+    if (countError) throw countError;
+    for (const r of rsvpRows ?? []) {
+      counts.set(r.event_id, (counts.get(r.event_id) ?? 0) + 1);
+    }
+  }
+
+  return rows
+    .filter((r) => r.event && !isConcluded({ eventDate: r.event.event_date }))
+    .map((r) => ({
+      id: r.event!.id,
+      groupId: r.event!.group_id,
+      groupName: r.event!.group?.name ?? 'a group',
+      title: r.event!.title,
+      sport: r.event!.sport,
+      eventDate: r.event!.event_date,
+      attendingCount: counts.get(r.event!.id) ?? 0,
+      myStatus: r.status,
+    }))
+    .sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+}
+
 /** Owner-only (enforced by RLS). */
 export async function createEvent(input: {
   groupId: string;

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import type { GameDayType } from '@/lib/gameday-quiz';
 import type { SportTag } from '@/lib/sports';
 
 export type { SportTag };
@@ -37,6 +38,7 @@ export type Profile = {
   walkupSong: WalkupSong | null;
   pickThree: PickThreeItem[];
   trophies: Trophy[];
+  gameDayType: GameDayType | null;
 };
 
 export function emptyProfile(id: string): Profile {
@@ -50,6 +52,7 @@ export function emptyProfile(id: string): Profile {
     walkupSong: null,
     pickThree: [],
     trophies: [],
+    gameDayType: null,
   };
 }
 
@@ -66,6 +69,7 @@ type ProfileRow = {
   walkup_song_preview_url: string | null;
   pick_three: PickThreeItem[] | null;
   trophies: Trophy[] | null;
+  game_day_type: string | null;
 };
 
 function rowToProfile(row: ProfileRow): Profile {
@@ -88,6 +92,7 @@ function rowToProfile(row: ProfileRow): Profile {
       : null,
     pickThree: row.pick_three ?? [],
     trophies: row.trophies ?? [],
+    gameDayType: (row.game_day_type as GameDayType | null) ?? null,
   };
 }
 
@@ -114,8 +119,38 @@ export async function saveProfile(profile: Profile): Promise<void> {
     walkup_song_preview_url: profile.walkupSong?.previewUrl ?? null,
     pick_three: profile.pickThree,
     trophies: profile.trophies,
+    game_day_type: profile.gameDayType,
     updated_at: new Date().toISOString(),
   });
 
   if (error) throw error;
+}
+
+/** Saved separately from the full profile form since the quiz is its own flow. */
+export async function saveGameDayType(userId: string, type: GameDayType): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ game_day_type: type, updated_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) throw error;
+}
+
+export type SimilarPerson = {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+};
+
+/** Other people who landed on the same game-day type — powers the "see
+ * people like you" link. Excludes the current user, caps at 10. */
+export async function fetchSimilarByGameDayType(userId: string, type: GameDayType): Promise<SimilarPerson[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, name, avatar_url')
+    .eq('game_day_type', type)
+    .neq('id', userId)
+    .limit(10);
+
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ id: r.id, name: r.name?.trim() || 'Nameless legend', avatarUrl: r.avatar_url }));
 }

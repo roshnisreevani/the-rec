@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Archive, Bell, Bookmark, Flame, MapPin, Settings, Users, X } from 'lucide-react-native';
+import { Archive, Bell, Bookmark, Download, Flame, MapPin, MessageCircle, RotateCcw, Rss, Settings, Users, X } from 'lucide-react-native';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -16,22 +16,25 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CrestAvatar } from '@/components/profile/crest-avatar';
+import { GameDayBadge } from '@/components/profile/gameday-badge';
 import { PickThreeField } from '@/components/profile/pick-three-field';
 import { PinnieIcon } from '@/components/profile/pinnie-icon';
 import { QrShareModal } from '@/components/profile/qr-share-modal';
 import { SportTagsField } from '@/components/profile/sport-tags-field';
 import { PostThumbnailGrid } from '@/components/feed/post-thumbnail-grid';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { FONTS, ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
+import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { fetchActivityStreakWeeks } from '@/lib/activity-streak';
 import { errorMessage } from '@/lib/error-message';
+import { fetchMyUpcomingEvents, formatEventDate, type UpcomingEvent } from '@/lib/events';
 import { fetchFollowCounts } from '@/lib/follows';
+import { GAME_DAY_TYPES } from '@/lib/gameday-quiz';
 import { fetchMyGroupsCount } from '@/lib/groups';
 import { fetchUnreadNotificationCount } from '@/lib/notifications';
 import { fetchFeaturedPosts, type Post } from '@/lib/posts';
-import { emptyProfile, fetchProfile, type Profile } from '@/lib/profile';
+import { emptyProfile, fetchProfile, fetchSimilarByGameDayType, type Profile, type SimilarPerson } from '@/lib/profile';
 
 export default function ProfileScreen() {
   const { session } = useAuth();
@@ -43,21 +46,24 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
+  const [gameDayShareOpen, setGameDayShareOpen] = useState(false);
   const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [groupsCount, setGroupsCount] = useState(0);
   const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
   const [streakWeeks, setStreakWeeks] = useState(0);
+  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
+  const [similarPeople, setSimilarPeople] = useState<SimilarPerson[]>([]);
 
   const load = useCallback(async () => {
     if (!userId) return;
 
-    // All six independent — fired together instead of one-by-one, so the
+    // All seven independent — fired together instead of one-by-one, so the
     // screen is ready after the slowest single request rather than the sum
     // of all of them. allSettled (not all) because the profile itself is the
     // only fatal one; a badge/count/streak failing shouldn't block the rest.
-    const [profileResult, notifResult, followResult, groupsResult, featuredResult, streakResult] =
+    const [profileResult, notifResult, followResult, groupsResult, featuredResult, streakResult, upcomingResult] =
       await Promise.allSettled([
         fetchProfile(userId),
         fetchUnreadNotificationCount(userId),
@@ -65,13 +71,17 @@ export default function ProfileScreen() {
         fetchMyGroupsCount(userId),
         fetchFeaturedPosts(userId),
         fetchActivityStreakWeeks(userId),
+        fetchMyUpcomingEvents(userId),
       ]);
 
+    let loadedProfile: Profile | null = null;
     if (profileResult.status === 'fulfilled') {
-      setProfile(profileResult.value);
+      loadedProfile = profileResult.value;
+      setProfile(loadedProfile);
     } else {
       Alert.alert('Could not load your profile', errorMessage(profileResult.reason));
-      setProfile(emptyProfile(userId));
+      loadedProfile = emptyProfile(userId);
+      setProfile(loadedProfile);
     }
     setLoading(false);
 
@@ -82,6 +92,15 @@ export default function ProfileScreen() {
     if (groupsResult.status === 'fulfilled') setGroupsCount(groupsResult.value);
     if (featuredResult.status === 'fulfilled') setFeaturedPosts(featuredResult.value);
     if (streakResult.status === 'fulfilled') setStreakWeeks(streakResult.value);
+    if (upcomingResult.status === 'fulfilled') setUpcomingEvents(upcomingResult.value);
+
+    if (loadedProfile.gameDayType) {
+      fetchSimilarByGameDayType(userId, loadedProfile.gameDayType)
+        .then(setSimilarPeople)
+        .catch(() => setSimilarPeople([]));
+    } else {
+      setSimilarPeople([]);
+    }
   }, [userId]);
 
   // Reload every time this tab gains focus, so edits made on the Edit Profile
@@ -133,21 +152,11 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Centered header: crest photo → streak → name → bio → location */}
+        {/* Centered header: crest photo → name → bio → location → streak/type pill */}
         <View style={styles.headerStack}>
           <AnimatedPressable onPress={() => setAvatarViewerOpen(true)} hitSlop={4}>
             <CrestAvatar name={profile.name} photoUri={profile.avatarUrl} size={155} />
           </AnimatedPressable>
-
-          {/* Streak counter — consecutive weeks with any app activity (see
-              lib/activity-streak.ts). Hidden below 1 week rather than showing
-              a deflating "0-week streak" to brand-new or inactive users. */}
-          {streakWeeks > 0 ? (
-            <View style={styles.streakPill}>
-              <Flame size={14} color={colors.coral} strokeWidth={2} fill={colors.coral} />
-              <Text style={styles.streakText}>{streakWeeks}-week streak</Text>
-            </View>
-          ) : null}
 
           <Text style={styles.name} numberOfLines={1}>
             {profile.name || 'Nameless legend'}
@@ -164,6 +173,38 @@ export default function ProfileScreen() {
             </View>
           ) : null}
 
+          {/* Combined streak + game-day type pill — two lightweight identity
+              signals in one compact row instead of two separate blocks.
+              Streak hidden below 1 week (see lib/activity-streak.ts) rather
+              than showing a deflating "0-week streak". Tapping the type side
+              opens the share sheet if set, or the quiz if not taken yet. */}
+          {streakWeeks > 0 || profile.gameDayType ? (
+            <View style={styles.identityPill}>
+              {streakWeeks > 0 ? (
+                <View style={styles.identityPillItem}>
+                  <Flame size={13} color={colors.coral} strokeWidth={2} fill={colors.coral} />
+                  <Text style={styles.identityPillText}>{streakWeeks}-week streak</Text>
+                </View>
+              ) : null}
+              {streakWeeks > 0 && profile.gameDayType ? <View style={styles.identityPillDivider} /> : null}
+              {profile.gameDayType ? (
+                <AnimatedPressable style={styles.identityPillItem} onPress={() => setGameDayShareOpen(true)}>
+                  <GameDayBadge type={profile.gameDayType} size={15} />
+                  <Text style={styles.identityPillText}>{GAME_DAY_TYPES[profile.gameDayType].label}</Text>
+                </AnimatedPressable>
+              ) : null}
+            </View>
+          ) : null}
+
+          {!profile.gameDayType ? (
+            <AnimatedPressable onPress={() => router.push('/gameday-quiz')}>
+              <Text style={styles.gameDayEmptyLink}>Take the 1-minute quiz to find your game-day type</Text>
+            </AnimatedPressable>
+          ) : null}
+
+          {profile.gameDayType && similarPeople.length > 0 ? (
+            <Text style={styles.seeAllLink}>See {similarPeople.length} people like you</Text>
+          ) : null}
         </View>
 
         {/* Stats — light rounded container, thin dividers */}
@@ -207,7 +248,33 @@ export default function ProfileScreen() {
           </AnimatedPressable>
         </View>
 
-        {/* Pick Your 3 — now the sole primary section here since walk-up song moved up top */}
+        {/* Upcoming — next RSVP'd game pulled across all groups (see
+            lib/events.ts fetchMyUpcomingEvents). Replaces the old static
+            Pick Your 3 photo grid with something that reflects real
+            commitments and is always relevant, not a one-time upload. */}
+        {upcomingEvents.length > 0 ? (
+          <Section title="Upcoming" styles={styles}>
+            <AnimatedPressable
+              style={styles.upcomingCard}
+              onPress={() => router.push('/my-schedule')}>
+              <View style={styles.upcomingTopRow}>
+                <Text style={styles.upcomingDate}>{formatEventDate(upcomingEvents[0].eventDate).toUpperCase()}</Text>
+                <View style={styles.goingPill}>
+                  <Text style={styles.goingPillText}>Going</Text>
+                </View>
+              </View>
+              <Text style={styles.upcomingTitle}>{upcomingEvents[0].title}</Text>
+            </AnimatedPressable>
+            {upcomingEvents.length > 1 ? (
+              <AnimatedPressable onPress={() => router.push('/my-schedule')}>
+                <Text style={styles.seeAllLink}>See full schedule</Text>
+              </AnimatedPressable>
+            ) : null}
+          </Section>
+        ) : null}
+
+        {/* Pick Your 3 — kept alongside the newer sections since photos are
+            still the clearest way for someone to see who you actually are. */}
         <Section title="Pick Your 3" styles={styles}>
           <PickThreeField editing={false} items={profile.pickThree} />
         </Section>
@@ -229,6 +296,58 @@ export default function ProfileScreen() {
           name={profile.name}
         />
       ) : null}
+
+      {/* Game-day type share sheet — feed/Banter/export are placeholders for
+          now (posting + image export are their own chunks of work), but the
+          picker itself is real. */}
+      <Modal
+        visible={gameDayShareOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGameDayShareOpen(false)}>
+        <Pressable style={styles.shareBackdrop} onPress={() => setGameDayShareOpen(false)}>
+          <Pressable style={styles.shareSheet} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.shareSheetTitle}>Share your game-day type</Text>
+            <AnimatedPressable
+              style={styles.shareOption}
+              onPress={() => {
+                setGameDayShareOpen(false);
+                Alert.alert('Share to Feed', 'Coming soon.');
+              }}>
+              <Rss size={18} color={colors.text} strokeWidth={1.75} />
+              <Text style={styles.shareOptionText}>Share to Feed</Text>
+            </AnimatedPressable>
+            <AnimatedPressable
+              style={styles.shareOption}
+              onPress={() => {
+                setGameDayShareOpen(false);
+                Alert.alert('Share in Banter', 'Coming soon.');
+              }}>
+              <MessageCircle size={18} color={colors.text} strokeWidth={1.75} />
+              <Text style={styles.shareOptionText}>Share with friends in Banter</Text>
+            </AnimatedPressable>
+            <AnimatedPressable
+              style={styles.shareOption}
+              onPress={() => {
+                setGameDayShareOpen(false);
+                Alert.alert('Export image', 'Coming soon.');
+              }}>
+              <Download size={18} color={colors.text} strokeWidth={1.75} />
+              <Text style={styles.shareOptionText}>Export as image</Text>
+            </AnimatedPressable>
+            <View style={styles.shareDivider} />
+            <AnimatedPressable
+              style={styles.shareOption}
+              onPress={() => {
+                setGameDayShareOpen(false);
+                router.push('/gameday-quiz');
+              }}>
+              <RotateCcw size={18} color={colors.text} strokeWidth={1.75} />
+              <Text style={styles.shareOptionText}>Retake quiz</Text>
+            </AnimatedPressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Instagram-style enlarged view of the profile picture */}
       <Modal
@@ -335,19 +454,23 @@ function makeStyles(colors: ThemeColors) {
     topIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 },
     // Everything in the header is center-aligned, stacked photo-first.
     headerStack: { alignItems: 'center', gap: 8, marginTop: 8 },
-    streakPill: {
+    // Combined streak + game-day type pill — one small surface instead of
+    // two separate blocks, matching the compact centered layout.
+    identityPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 5,
-      marginTop: 2,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      marginTop: 4,
+      backgroundColor: colors.borderSoft,
       borderRadius: RADII.pill,
-      borderWidth: 1,
-      borderColor: colors.border,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      gap: 10,
     },
-    streakText: { fontSize: 12, fontWeight: WEIGHT.semibold, color: colors.text },
-    name: { fontSize: 22, fontFamily: FONTS.display, color: colors.text, textAlign: 'center' },
+    identityPillItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    identityPillText: { fontSize: 12, fontWeight: WEIGHT.semibold, color: colors.text },
+    identityPillDivider: { width: 1, height: 12, backgroundColor: colors.border },
+    gameDayEmptyLink: { fontSize: 12, color: colors.coral, textAlign: 'center', marginTop: 2 },
+    name: { fontSize: 22, fontWeight: WEIGHT.bold, color: colors.text, textAlign: 'center' },
     locationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
     // Light rounded container with thin dividers between the three stats.
     statRow: {
@@ -389,7 +512,7 @@ function makeStyles(colors: ThemeColors) {
       borderColor: colors.border,
       backgroundColor: colors.background,
     },
-    secondaryButtonText: { fontFamily: FONTS.displaySemibold, fontSize: 14, color: colors.text },
+    secondaryButtonText: { fontWeight: WEIGHT.semibold, fontSize: 14, color: colors.text },
     primaryButton: {
       flex: 1,
       alignItems: 'center',
@@ -397,8 +520,33 @@ function makeStyles(colors: ThemeColors) {
       borderRadius: RADII.md,
       backgroundColor: colors.coral,
     },
-    primaryButtonText: { fontFamily: FONTS.displaySemibold, fontSize: 14, color: ON_ACCENT },
+    primaryButtonText: { fontWeight: WEIGHT.semibold, fontSize: 14, color: ON_ACCENT },
     section: { marginTop: 26, gap: 10 },
-    sectionTitle: { fontSize: 13, fontFamily: FONTS.displaySemibold, color: colors.text },
+    sectionTitle: { fontSize: 13, fontWeight: WEIGHT.semibold, color: colors.text },
+    upcomingCard: { backgroundColor: colors.borderSoft, borderRadius: RADII.lg, padding: 14 },
+    upcomingTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+    upcomingDate: { fontSize: 11, fontWeight: WEIGHT.semibold, color: colors.coral },
+    goingPill: {
+      backgroundColor: colors.background,
+      borderRadius: RADII.pill,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+    },
+    goingPillText: { fontSize: 10, fontWeight: WEIGHT.semibold, color: colors.text },
+    upcomingTitle: { fontSize: 15, fontWeight: WEIGHT.semibold, color: colors.text },
+    seeAllLink: { fontSize: 12, color: colors.coral, textAlign: 'center' },
+    shareBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+    shareSheet: {
+      backgroundColor: colors.background,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 20,
+      paddingBottom: 32,
+      gap: 4,
+    },
+    shareSheetTitle: { fontSize: 14, fontWeight: WEIGHT.semibold, color: colors.textSecondary, marginBottom: 10 },
+    shareOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },
+    shareOptionText: { fontSize: 15, color: colors.text },
+    shareDivider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 4 },
   });
 }

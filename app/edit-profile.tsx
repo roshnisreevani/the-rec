@@ -57,6 +57,9 @@ export default function EditProfileScreen() {
   // column on the profile row — carried through from the initial load so
   // saving here never wipes out (or requires a redundant re-fetch of) it.
   const [trophies, setTrophies] = useState<Trophy[]>([]);
+  // Same story as trophies — not edited on this screen (it's set via the
+  // game-day quiz), just carried through so saving here doesn't clobber it.
+  const [gameDayType, setGameDayType] = useState<Profile['gameDayType']>(null);
   const lastRoastIndex = useRef<number | null>(null);
 
   const load = useCallback(async () => {
@@ -76,6 +79,7 @@ export default function EditProfileScreen() {
       });
       setSlots(nextSlots);
       setTrophies(profile.trophies);
+      setGameDayType(profile.gameDayType);
     } catch (e) {
       Alert.alert('Could not load your profile', errorMessage(e));
     } finally {
@@ -169,6 +173,7 @@ export default function EditProfileScreen() {
         walkupSong: song,
         pickThree: uploaded.filter((item): item is { url: string; caption: string } => item !== null),
         trophies,
+        gameDayType,
       };
 
       await saveProfile(updated);
