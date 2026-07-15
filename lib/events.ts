@@ -26,7 +26,8 @@ export type GroupEvent = {
   maxSpots: number | null; // null = unlimited
   createdBy: string;
   attendingCount: number;
-  attendees: EventAttendee[]; // attending only — the MVP candidate pool
+  attendees: EventAttendee[]; // attending, first-committed-first — facepile + MVP pool
+  decliners: EventAttendee[]; // declined, for the attendee list modal
   myStatus: RsvpStatus | null;
   myVoteFor: string | null;
   mvpTally: MvpTallyRow[]; // sorted most votes first (concluded events)
@@ -62,6 +63,7 @@ type RsvpRow = {
   event_id: string;
   user_id: string;
   status: RsvpStatus;
+  responded_at: string;
   profile: { name: string | null; avatar_url: string | null } | null;
 };
 
@@ -92,7 +94,7 @@ export async function fetchGroupEvents(groupId: string, userId: string): Promise
   const [rsvpsRes, votesRes] = await Promise.all([
     supabase
       .from('group_event_rsvps')
-      .select('event_id, user_id, status, profile:profiles!group_event_rsvps_user_id_fkey(name, avatar_url)')
+      .select('event_id, user_id, status, responded_at, profile:profiles!group_event_rsvps_user_id_fkey(name, avatar_url)')
       .in('event_id', eventIds),
     supabase.from('group_event_mvp_votes').select('event_id, voter_id, voted_for_id').in('event_id', eventIds),
   ]);
@@ -103,16 +105,20 @@ export async function fetchGroupEvents(groupId: string, userId: string): Promise
   const rsvps = (rsvpsRes.data ?? []) as unknown as RsvpRow[];
   const votes = (votesRes.data ?? []) as VoteRow[];
 
+  const toAttendee = (r: RsvpRow): EventAttendee => ({
+    userId: r.user_id,
+    name: r.profile?.name?.trim() || 'Nameless legend',
+    avatarUrl: r.profile?.avatar_url ?? null,
+    status: r.status,
+  });
+
   const result = events.map((row) => {
-    const eventRsvps = rsvps.filter((r) => r.event_id === row.id);
-    const attendees: EventAttendee[] = eventRsvps
-      .filter((r) => r.status === 'attending')
-      .map((r) => ({
-        userId: r.user_id,
-        name: r.profile?.name?.trim() || 'Nameless legend',
-        avatarUrl: r.profile?.avatar_url ?? null,
-        status: r.status,
-      }));
+    // First-committed-first — keeps the facepile/attendee ordering stable.
+    const eventRsvps = rsvps
+      .filter((r) => r.event_id === row.id)
+      .sort((a, b) => a.responded_at.localeCompare(b.responded_at));
+    const attendees: EventAttendee[] = eventRsvps.filter((r) => r.status === 'attending').map(toAttendee);
+    const decliners: EventAttendee[] = eventRsvps.filter((r) => r.status === 'declined').map(toAttendee);
 
     const eventVotes = votes.filter((v) => v.event_id === row.id);
     const voteCounts = new Map<string, number>();
@@ -137,6 +143,7 @@ export async function fetchGroupEvents(groupId: string, userId: string): Promise
       createdBy: row.created_by,
       attendingCount: attendees.length,
       attendees,
+      decliners,
       myStatus: eventRsvps.find((r) => r.user_id === userId)?.status ?? null,
       myVoteFor: eventVotes.find((v) => v.voter_id === userId)?.voted_for_id ?? null,
       mvpTally,

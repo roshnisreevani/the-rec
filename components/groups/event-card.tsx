@@ -1,6 +1,6 @@
 import { Calendar, MapPin, Trophy } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { InitialsAvatar } from '@/components/profile/initials-avatar';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -39,6 +39,7 @@ export function EventCard({ event, currentUserId, onChanged }: Props) {
   const [busy, setBusy] = useState(false);
   const [changing, setChanging] = useState(false); // re-open RSVP buttons
   const [changingVote, setChangingVote] = useState(false);
+  const [attendeesOpen, setAttendeesOpen] = useState(false);
 
   const sportOption = SPORTS.find((s) => s.value === event.sport);
   const accent = accentFor(event.sport, colors);
@@ -51,10 +52,17 @@ export function EventCard({ event, currentUserId, onChanged }: Props) {
     (event.maxSpots - event.attendingCount <= 2 || event.attendingCount / event.maxSpots >= 0.8);
 
   const spotsLabel =
-    event.maxSpots === null
-      ? `${event.attendingCount} going`
-      : `${event.attendingCount} of ${event.maxSpots} spots filled`;
+    event.attendingCount === 0 && event.maxSpots === null
+      ? "No one's in yet"
+      : event.maxSpots === null
+        ? `${event.attendingCount} going`
+        : `${event.attendingCount} of ${event.maxSpots} spots filled`;
   const fillPct = event.maxSpots === null ? 0 : Math.min(100, (event.attendingCount / event.maxSpots) * 100);
+
+  const MAX_FACES = 4;
+  const visibleFaces = event.attendees.slice(0, MAX_FACES);
+  const hiddenFaces = event.attendingCount - visibleFaces.length;
+  const hasAnyResponse = event.attendees.length > 0 || event.decliners.length > 0;
 
   const handleRsvp = async (status: RsvpStatus) => {
     setBusy(true);
@@ -123,7 +131,30 @@ export function EventCard({ event, currentUserId, onChanged }: Props) {
           </View>
         ) : null}
 
-        <Text style={[styles.spots, full && styles.spotsFull]}>{spotsLabel}</Text>
+        <AnimatedPressable
+          style={styles.attendRow}
+          onPress={() => setAttendeesOpen(true)}
+          disabled={!hasAnyResponse}>
+          {visibleFaces.length > 0 ? (
+            <View style={styles.facepile}>
+              {visibleFaces.map((attendee, index) => (
+                <View key={attendee.userId} style={[styles.faceWrap, index > 0 && styles.faceOverlap]}>
+                  {attendee.avatarUrl ? (
+                    <Image source={{ uri: attendee.avatarUrl }} style={styles.faceImage} />
+                  ) : (
+                    <InitialsAvatar name={attendee.name} size={26} />
+                  )}
+                </View>
+              ))}
+              {hiddenFaces > 0 ? (
+                <View style={[styles.faceWrap, styles.faceOverlap, styles.moreBubble]}>
+                  <Text style={styles.moreBubbleText}>+{hiddenFaces}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+          <Text style={[styles.spots, full && styles.spotsFull]}>{spotsLabel}</Text>
+        </AnimatedPressable>
         {event.maxSpots !== null ? (
           <View style={styles.progressTrack}>
             <View
@@ -221,6 +252,56 @@ export function EventCard({ event, currentUserId, onChanged }: Props) {
           </View>
         )}
       </View>
+
+      {/* Who's in / who's out */}
+      <Modal visible={attendeesOpen} transparent animationType="fade" onRequestClose={() => setAttendeesOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setAttendeesOpen(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle} numberOfLines={1}>
+              {event.title}
+            </Text>
+            <ScrollView contentContainerStyle={styles.modalList}>
+              <Text style={styles.modalSection}>Going ({event.attendingCount})</Text>
+              {event.attendees.length === 0 ? (
+                <Text style={styles.modalEmpty}>No one yet.</Text>
+              ) : (
+                event.attendees.map((person) => (
+                  <View key={person.userId} style={styles.personRow}>
+                    {person.avatarUrl ? (
+                      <Image source={{ uri: person.avatarUrl }} style={styles.personAvatar} />
+                    ) : (
+                      <InitialsAvatar name={person.name} size={30} />
+                    )}
+                    <Text style={styles.personName} numberOfLines={1}>
+                      {person.name}
+                    </Text>
+                  </View>
+                ))
+              )}
+              {event.decliners.length > 0 ? (
+                <>
+                  <Text style={styles.modalSection}>Can&apos;t make it ({event.decliners.length})</Text>
+                  {event.decliners.map((person) => (
+                    <View key={person.userId} style={styles.personRow}>
+                      {person.avatarUrl ? (
+                        <Image source={{ uri: person.avatarUrl }} style={styles.personAvatar} />
+                      ) : (
+                        <InitialsAvatar name={person.name} size={30} />
+                      )}
+                      <Text style={styles.personName} numberOfLines={1}>
+                        {person.name}
+                      </Text>
+                    </View>
+                  ))}
+                </>
+              ) : null}
+            </ScrollView>
+            <AnimatedPressable style={styles.modalDone} onPress={() => setAttendeesOpen(false)}>
+              <Text style={styles.modalDoneText}>Done</Text>
+            </AnimatedPressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -256,8 +337,56 @@ function makeStyles(colors: ThemeColors) {
     body: { padding: 14, gap: 6 },
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
     metaText: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
-    spots: { fontSize: 12, fontWeight: WEIGHT.semibold, color: colors.blue, marginTop: 2 },
+    // Facepile row: overlapping avatars + the (now secondary) spots caption.
+    attendRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+    facepile: { flexDirection: 'row', alignItems: 'center' },
+    faceWrap: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      borderWidth: 2,
+      borderColor: colors.background,
+      backgroundColor: colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    faceOverlap: { marginLeft: -10 },
+    faceImage: { width: 26, height: 26, borderRadius: 13 },
+    moreBubble: { backgroundColor: colors.borderSoft },
+    moreBubbleText: { fontSize: 10, fontWeight: WEIGHT.bold, color: colors.textSecondary },
+    spots: { flexShrink: 1, fontSize: 11, fontWeight: WEIGHT.semibold, color: colors.textSecondary },
     spotsFull: { color: colors.coral },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 28,
+    },
+    modalCard: {
+      alignSelf: 'stretch',
+      maxHeight: '70%',
+      backgroundColor: colors.background,
+      borderRadius: RADII.lg,
+      padding: 20,
+      gap: 10,
+    },
+    modalTitle: { fontSize: 16, fontWeight: WEIGHT.bold, color: colors.text, textAlign: 'center' },
+    modalList: { gap: 8 },
+    modalSection: { fontSize: 12, fontWeight: WEIGHT.bold, color: colors.textSecondary, marginTop: 6 },
+    modalEmpty: { fontSize: 13, fontStyle: 'italic', color: colors.textSecondary },
+    personRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
+    personAvatar: { width: 30, height: 30, borderRadius: 15 },
+    personName: { flex: 1, fontSize: 14, fontWeight: WEIGHT.medium, color: colors.text },
+    modalDone: {
+      marginTop: 4,
+      backgroundColor: colors.coral,
+      borderRadius: RADII.md,
+      paddingVertical: 11,
+      alignItems: 'center',
+    },
+    modalDoneText: { color: ON_ACCENT, fontWeight: WEIGHT.semibold, fontSize: 14 },
     progressTrack: {
       height: 6,
       borderRadius: 3,
