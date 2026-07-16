@@ -13,7 +13,7 @@ import { FONTS, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { blockUser, reportContent, type ReportReason } from '@/lib/moderation';
-import { deletePost, fetchPostById, resharePost, setReaction, totalReactions, type Post } from '@/lib/posts';
+import { archivePost, fetchPostById, resharePost, setReaction, totalReactions, type Post } from '@/lib/posts';
 import { HOT_THRESHOLD, type ReactionType } from '@/lib/reactions';
 
 /**
@@ -83,17 +83,17 @@ export default function PostDetailScreen() {
 
   const handleDelete = () => {
     if (!post) return;
-    Alert.alert('Delete this post?', undefined, [
+    Alert.alert('Remove this post?', 'It will be moved to your Archive.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
+        text: 'Remove',
         style: 'destructive',
         onPress: async () => {
           try {
-            await deletePost(post);
+            await archivePost(post);
             router.back();
           } catch (e) {
-            Alert.alert('Could not delete post', e instanceof Error ? e.message : 'Unknown error.');
+            Alert.alert('Could not remove post', e instanceof Error ? e.message : 'Unknown error.');
           }
         },
       },
