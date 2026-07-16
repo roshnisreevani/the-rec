@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CrestAvatar } from '@/components/profile/crest-avatar';
 import { GameDayBadge } from '@/components/profile/gameday-badge';
+import { PhotoViewer } from '@/components/profile/photo-viewer';
 import { PickThreeField } from '@/components/profile/pick-three-field';
 import { PinnieIcon } from '@/components/profile/pinnie-icon';
 import { QrShareModal } from '@/components/profile/qr-share-modal';
@@ -48,6 +49,7 @@ export default function ProfileScreen() {
   const [shareOpen, setShareOpen] = useState(false);
   const [gameDayShareOpen, setGameDayShareOpen] = useState(false);
   const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
+  const [pickThreeViewerIndex, setPickThreeViewerIndex] = useState<number | null>(null);
   const [activeContentTab, setActiveContentTab] = useState<'pickThree' | 'featured'>('pickThree');
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
@@ -302,7 +304,11 @@ export default function ProfileScreen() {
           </View>
 
           {activeContentTab === 'pickThree' ? (
-            <PickThreeField editing={false} items={profile.pickThree} />
+            <PickThreeField
+              editing={false}
+              items={profile.pickThree}
+              onPressItem={setPickThreeViewerIndex}
+            />
           ) : featuredPosts.length > 0 ? (
             <PostThumbnailGrid posts={featuredPosts} colors={colors} />
           ) : (
@@ -392,6 +398,13 @@ export default function ProfileScreen() {
           />
         </Pressable>
       </Modal>
+
+      <PhotoViewer
+        photos={profile.pickThree}
+        initialIndex={pickThreeViewerIndex ?? 0}
+        visible={pickThreeViewerIndex !== null}
+        onClose={() => setPickThreeViewerIndex(null)}
+      />
     </SafeAreaView>
   );
 }

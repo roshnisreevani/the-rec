@@ -26,6 +26,7 @@ type EditProps = {
 type ViewProps = {
   editing: false;
   items: PickThreeItem[];
+  onPressItem?: (index: number) => void; // tap a filled photo to open it larger
 };
 
 type Props = EditProps | ViewProps;
@@ -78,16 +79,23 @@ export function PickThreeField(props: Props) {
     );
   }
 
-  const { items } = props;
+  const { items, onPressItem } = props;
   return (
     <View style={styles.row}>
       {[0, 1, 2].map((index) => {
         const item = items[index];
+        const square = (
+          <View style={[styles.square, !item && styles.squareEmpty]}>
+            {item ? <Image source={{ uri: item.url }} style={styles.image} cachePolicy="disk" /> : null}
+          </View>
+        );
         return (
           <View key={index} style={styles.column}>
-            <View style={[styles.square, !item && styles.squareEmpty]}>
-              {item ? <Image source={{ uri: item.url }} style={styles.image} cachePolicy="disk" /> : null}
-            </View>
+            {item && onPressItem ? (
+              <AnimatedPressable onPress={() => onPressItem(index)}>{square}</AnimatedPressable>
+            ) : (
+              square
+            )}
             {item ? (
               <Text numberOfLines={2} style={styles.captionText}>
                 {item.caption}
