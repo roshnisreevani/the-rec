@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { MessageCircle, MoreHorizontal } from 'lucide-react-native';
+import { MapPin, MessageCircle, MoreHorizontal } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
@@ -152,6 +152,14 @@ export function PostCard({
           <Text style={styles.groupLine} numberOfLines={1}>
             {sportLabel(post.sportTag)} · {timeAgo(post.createdAt)}
           </Text>
+          {post.location ? (
+            <View style={styles.locationLine}>
+              <MapPin size={11} color={colors.textSecondary} strokeWidth={1.75} />
+              <Text style={styles.locationText} numberOfLines={1}>
+                {post.location}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {isPostOfWeek ? (
@@ -245,6 +253,8 @@ function makeStyles(colors: ThemeColors) {
     headerText: { flex: 1, gap: 1 },
     authorName: { fontSize: 13, fontWeight: WEIGHT.semibold, color: colors.text },
     groupLine: { fontSize: 11, color: colors.textSecondary },
+    locationLine: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    locationText: { fontSize: 11, color: colors.textSecondary },
     hotBadge: {
       backgroundColor: colors.coral,
       borderRadius: RADII.pill,

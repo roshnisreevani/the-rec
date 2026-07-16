@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { MapPin } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -113,6 +114,7 @@ export default function CreatePostScreen() {
 
   const [media, setMedia] = useState<{ uri: string; type: MediaType } | null>(null);
   const [caption, setCaption] = useState('');
+  const [location, setLocation] = useState('');
   const [posting, setPosting] = useState(false);
   const [sportTag, setSportTag] = useState<SportTag | null>(null);
   const [selfRating, setSelfRating] = useState<number | null>(null);
@@ -183,6 +185,7 @@ export default function CreatePostScreen() {
         groupId: groupId ?? null,
         sportTag,
         caption: caption.trim(),
+        location: location.trim() || null,
         localMediaUri: media.uri,
         mediaType: media.type,
         selfRating,
@@ -263,6 +266,17 @@ export default function CreatePostScreen() {
               onSelect={handleMentionSelect}
             />
           ) : null}
+
+          <View style={styles.locationRow}>
+            <MapPin size={16} color={colors.textSecondary} strokeWidth={1.75} />
+            <TextInput
+              style={styles.locationInput}
+              placeholder="Add location (optional)"
+              placeholderTextColor={colors.textSecondary}
+              value={location}
+              onChangeText={setLocation}
+            />
+          </View>
 
           <PennyRatingSelector value={selfRating} onChange={setSelfRating} />
 
@@ -362,6 +376,18 @@ function makeStyles(colors: ThemeColors) {
       textAlignVertical: 'top',
       backgroundColor: colors.background,
     },
+    locationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: RADII.md,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      backgroundColor: colors.background,
+    },
+    locationInput: { flex: 1, fontSize: 14, color: colors.text, padding: 0 },
     sectionLabel: { fontSize: 13, fontWeight: WEIGHT.bold, color: colors.text },
     groupRow: { gap: 8 },
     groupPill: {

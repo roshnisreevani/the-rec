@@ -21,6 +21,7 @@ export type Post = {
   groupName: string;
   groupEmoji: string;
   caption: string;
+  location: string | null;
   mediaUrl: string;
   mediaType: MediaType;
   createdAt: string;
@@ -59,6 +60,7 @@ type PostRow = {
   group_id: string | null;
   sport_tag: string | null;
   caption: string | null;
+  location: string | null;
   media_url: string;
   media_type: MediaType;
   created_at: string;
@@ -106,6 +108,7 @@ function rowToPost(row: PostRow, currentUserId: string | undefined): Post {
     groupName: group?.name ?? 'General',
     groupEmoji: group?.emoji ?? '🏟️',
     caption: row.caption ?? '',
+    location: row.location ?? null,
     mediaUrl: row.media_url,
     mediaType: row.media_type,
     createdAt: row.created_at,
@@ -275,6 +278,7 @@ export async function createPost(input: {
   groupId?: string | null;
   sportTag: string | null;
   caption: string;
+  location?: string | null;
   localMediaUri: string;
   mediaType: MediaType;
   selfRating?: number | null;
@@ -286,6 +290,7 @@ export async function createPost(input: {
     group_id: input.groupId ?? null,
     sport_tag: input.sportTag,
     caption: input.caption,
+    location: input.location?.trim() || null,
     media_url: mediaUrl,
     media_type: input.mediaType,
     self_rating: input.selfRating ?? null,
