@@ -8,7 +8,6 @@ import { FlyingReaction } from '@/components/feed/flying-reaction';
 import { PostVideo } from '@/components/feed/post-video';
 import { GradientScrim } from '@/components/feed/gradient-scrim';
 import { ReactionBar } from '@/components/feed/reaction-bar';
-import { ShareSheet } from '@/components/feed/share-sheet';
 import { StreakBadge } from '@/components/feed/streak-badge';
 import { ContentMenu } from '@/components/moderation/content-menu';
 import { InitialsAvatar } from '@/components/profile/initials-avatar';
@@ -85,7 +84,6 @@ export function SessionPostCard({
   const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [flyKey, setFlyKey] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const isOwn = post.authorId === currentUserId;
   const hasReactedFire = post.myReactions.includes('fire');
   const showStreak = hasReactedFire && streak >= STREAK_DISPLAY_THRESHOLD;
@@ -200,7 +198,6 @@ export function SessionPostCard({
             counts={post.reactionCounts}
             active={post.myReactions}
             onToggle={onToggleReaction}
-            onOpenShare={() => setShareSheetOpen(true)}
           />
           <Pressable style={styles.commentButton} onPress={onOpenComments} hitSlop={8}>
             <MessageCircle size={16} color={colors.blue} strokeWidth={1.75} />
@@ -208,14 +205,6 @@ export function SessionPostCard({
           </Pressable>
         </View>
       </View>
-
-      <ShareSheet
-        visible={shareSheetOpen}
-        post={post}
-        currentUserId={currentUserId}
-        onClose={() => setShareSheetOpen(false)}
-        onReshare={onReshare}
-      />
 
       <ContentMenu
         visible={menuOpen}

@@ -188,6 +188,7 @@ export default function PostDetailScreen() {
                   onReport={handleReport}
                   onBlock={handleBlock}
                   onReshare={handleReshare}
+                  showShare
                 />
                 {post.selfRating ? (
                   <View style={styles.ratingWrap}>

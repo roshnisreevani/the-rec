@@ -11,7 +11,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CommentsModal } from '@/components/feed/comments-modal';
 import { FeedCarousel } from '@/components/feed/feed-carousel';
-import { FeedEndCard } from '@/components/feed/feed-end-card';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
@@ -196,7 +195,7 @@ export default function FeedScreen() {
   return (
     <SafeAreaView style={styles.flex} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Feed</Text>
+        <Text style={styles.headerTitle}>Scoreboard</Text>
         <AnimatedPressable hitSlop={8} onPress={() => router.push('/find-people')}>
           <Search size={22} color={colors.text} strokeWidth={1.75} />
         </AnimatedPressable>
@@ -238,7 +237,6 @@ export default function FeedScreen() {
                 onBlock={handleBlockUser}
                 onReshare={handleReshare}
               />
-              <FeedEndCard />
             </>
           )}
         </ScrollView>

@@ -84,7 +84,7 @@ export default function GroupsScreen() {
   return (
     <SafeAreaView style={styles.flex} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Groups</Text>
+        <Text style={styles.headerTitle}>Teams</Text>
         <AnimatedPressable style={styles.createButton} onPress={() => router.push('/create-group')}>
           <Plus size={16} color={ON_ACCENT} strokeWidth={2.5} />
           <Text style={styles.createButtonText}>Create Group</Text>
