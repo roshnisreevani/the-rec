@@ -16,6 +16,7 @@ import { CrestAvatar } from '@/components/profile/crest-avatar';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { FONTS, ON_ACCENT, RADII, type ThemeColors } from '@/constants/style';
 import { useThemeColors } from '@/contexts/theme-context';
+import { errorMessage } from '@/lib/error-message';
 import { blockUser, reportContent, type ReportReason } from '@/lib/moderation';
 import { addComment, deleteComment, fetchComments, type Comment } from '@/lib/posts';
 
@@ -107,7 +108,11 @@ export function CommentsSection({
       await load();
       onCommentAdded();
     } catch (e) {
-      Alert.alert('Could not post comment', e instanceof Error ? e.message : 'Unknown error.');
+      // Supabase result errors are plain objects, not Error instances — the
+      // old `e instanceof Error` check swallowed the real message into
+      // "Unknown error". errorMessage() reads `.message` off either shape.
+      console.warn('[comments] addComment failed:', e);
+      Alert.alert('Could not post comment', errorMessage(e));
     } finally {
       setSending(false);
     }
