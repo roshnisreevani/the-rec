@@ -64,6 +64,7 @@ function RootNavigator() {
             <Stack.Screen name="saved-posts" options={{ headerShown: false }} />
             <Stack.Screen name="gameday-quiz" options={{ headerShown: false, presentation: 'modal' }} />
             <Stack.Screen name="my-schedule" options={{ headerShown: false }} />
+            <Stack.Screen name="similar-people" options={{ headerShown: false }} />
             <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
             <Stack.Screen name="terms-of-service" options={{ headerShown: false }} />
             <Stack.Screen name="post/[id]" options={{ headerShown: false }} />

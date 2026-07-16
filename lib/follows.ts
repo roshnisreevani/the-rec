@@ -116,14 +116,14 @@ export async function fetchFollowCounts(userId: string): Promise<{ followers: nu
 /** How many accounts both users follow — the "mutual follows" signal shown
  * on someone else's profile before you follow them. */
 export async function fetchMutualFollowsCount(userId: string, otherUserId: string): Promise<number> {
-  const [mineRes, theirsRes] = await Promise.all([
-    supabase.from('follows').select('followee_id').eq('follower_id', userId),
-    supabase.from('follows').select('followee_id').eq('follower_id', otherUserId),
-  ]);
+  const list = await fetchMutualFollows(userId, otherUserId);
+  return list.length;
+}
 
-  if (mineRes.error) throw mineRes.error;
-  if (theirsRes.error) throw theirsRes.error;
-
-  const mine = new Set((mineRes.data ?? []).map((r) => r.followee_id as string));
-  return (theirsRes.data ?? []).filter((r) => mine.has(r.followee_id as string)).length;
+/** The actual people both users follow, not just the count — powers the
+ * "Mutual" stat being tappable on someone else's profile. */
+export async function fetchMutualFollows(userId: string, otherUserId: string): Promise<FollowUser[]> {
+  const [mine, theirs] = await Promise.all([fetchFollowing(userId), fetchFollowing(otherUserId)]);
+  const mineIds = new Set(mine.map((f) => f.id));
+  return theirs.filter((f) => mineIds.has(f.id));
 }

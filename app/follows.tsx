@@ -10,36 +10,49 @@ import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { errorMessage } from '@/lib/error-message';
-import { fetchFollowers, fetchFollowing, type FollowUser } from '@/lib/follows';
+import { fetchFollowers, fetchFollowing, fetchMutualFollows, type FollowUser } from '@/lib/follows';
 
-type Tab = 'followers' | 'following';
+type Tab = 'followers' | 'following' | 'mutual';
 
+/**
+ * Followers/Following list — for your own profile by default, or for
+ * someone else's when a `userId` param is passed (e.g. from user/[id].tsx's
+ * stat row). A "Mutual" tab only appears when viewing someone else, showing
+ * who you both follow.
+ */
 export default function FollowsScreen() {
-  const { tab: initialTab } = useLocalSearchParams<{ tab?: string }>();
+  const { tab: initialTab, userId: targetUserIdParam } = useLocalSearchParams<{ tab?: string; userId?: string }>();
   const { session } = useAuth();
-  const userId = session?.user.id;
+  const myUserId = session?.user.id;
+  const targetUserId = targetUserIdParam || myUserId;
+  const isOwnProfile = targetUserId === myUserId;
   const router = useRouter();
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const [tab, setTab] = useState<Tab>(initialTab === 'following' ? 'following' : 'followers');
+  const [tab, setTab] = useState<Tab>(
+    initialTab === 'following' ? 'following' : initialTab === 'mutual' ? 'mutual' : 'followers'
+  );
   const [followers, setFollowers] = useState<FollowUser[]>([]);
   const [following, setFollowing] = useState<FollowUser[]>([]);
+  const [mutual, setMutual] = useState<FollowUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!targetUserId) return;
     let cancelled = false;
 
     (async () => {
       try {
-        const [fetchedFollowers, fetchedFollowing] = await Promise.all([
-          fetchFollowers(userId),
-          fetchFollowing(userId),
+        const [fetchedFollowers, fetchedFollowing, fetchedMutual] = await Promise.all([
+          fetchFollowers(targetUserId),
+          fetchFollowing(targetUserId),
+          !isOwnProfile && myUserId ? fetchMutualFollows(myUserId, targetUserId) : Promise.resolve([]),
         ]);
         if (cancelled) return;
         setFollowers(fetchedFollowers);
         setFollowing(fetchedFollowing);
+        setMutual(fetchedMutual);
       } catch (e) {
         if (!cancelled) Alert.alert('Could not load list', errorMessage(e));
       } finally {
@@ -50,9 +63,19 @@ export default function FollowsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [targetUserId, myUserId, isOwnProfile]);
 
-  const data = tab === 'followers' ? followers : following;
+  const data = tab === 'followers' ? followers : tab === 'following' ? following : mutual;
+
+  const tabs: Tab[] = isOwnProfile ? ['followers', 'following'] : ['followers', 'following', 'mutual'];
+
+  const tabLabel = (t: Tab) => {
+    if (t === 'followers') return `Followers (${followers.length})`;
+    if (t === 'following') return `Following (${following.length})`;
+    return `Mutual (${mutual.length})`;
+  };
+
+  const headerTitle = tab === 'followers' ? 'Followers' : tab === 'following' ? 'Following' : 'Mutual';
 
   return (
     <SafeAreaView style={styles.flex} edges={['top']}>
@@ -60,21 +83,19 @@ export default function FollowsScreen() {
         <AnimatedPressable onPress={() => router.back()} hitSlop={8}>
           <ChevronLeft size={26} color={colors.text} strokeWidth={2} />
         </AnimatedPressable>
-        <Text style={styles.headerTitle}>{tab === 'followers' ? 'Followers' : 'Following'}</Text>
+        <Text style={styles.headerTitle}>{headerTitle}</Text>
         <View style={{ width: 26 }} />
       </View>
 
       <View style={styles.tabRow}>
-        {(['followers', 'following'] as const).map((t) => {
+        {tabs.map((t) => {
           const selected = t === tab;
           return (
             <AnimatedPressable
               key={t}
               style={[styles.tabPill, selected && styles.tabPillSelected]}
               onPress={() => setTab(t)}>
-              <Text style={[styles.tabPillText, selected && styles.tabPillTextSelected]}>
-                {t === 'followers' ? `Followers (${followers.length})` : `Following (${following.length})`}
-              </Text>
+              <Text style={[styles.tabPillText, selected && styles.tabPillTextSelected]}>{tabLabel(t)}</Text>
             </AnimatedPressable>
           );
         })}
@@ -89,7 +110,11 @@ export default function FollowsScreen() {
           contentContainerStyle={styles.list}
           ListEmptyComponent={
             <Text style={styles.empty}>
-              {tab === 'followers' ? 'No followers yet.' : 'Not following anyone yet.'}
+              {tab === 'followers'
+                ? 'No followers yet.'
+                : tab === 'following'
+                  ? 'Not following anyone yet.'
+                  : "No mutual follows yet."}
             </Text>
           }
           renderItem={({ item }) => (

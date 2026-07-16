@@ -208,7 +208,11 @@ export default function ProfileScreen() {
           ) : null}
 
           {profile.gameDayType && similarPeople.length > 0 ? (
-            <Text style={styles.seeAllLink}>See {similarPeople.length} people like you</Text>
+            <AnimatedPressable
+              onPress={() => router.push(`/similar-people?type=${profile.gameDayType}`)}
+              hitSlop={6}>
+              <Text style={styles.seeAllLink}>See {similarPeople.length} people like you</Text>
+            </AnimatedPressable>
           ) : null}
         </View>
 

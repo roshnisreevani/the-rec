@@ -35,9 +35,7 @@ export function SportTagsField({ editing, selected, onToggle }: Props) {
   const selectedPills = (
     <View style={styles.wrap}>
       {selected.length === 0 ? (
-        <Text style={styles.empty}>
-          {editing ? 'Nothing picked yet — search below.' : 'No sports claimed yet. Bold strategy.'}
-        </Text>
+        editing ? <Text style={styles.empty}>Nothing picked yet — search below.</Text> : null
       ) : (
         selected.map((value) => (
           <AnimatedPressable

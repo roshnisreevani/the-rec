@@ -24,6 +24,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { fetchAllowsConnectionRequests, fetchIsPrivate } from '@/lib/connections';
 import {
+  fetchFollowCounts,
   fetchFollowState,
   fetchMutualFollowsCount,
   followUser,
@@ -55,6 +56,7 @@ export default function UserProfileScreen() {
   const [allowsRequests, setAllowsRequests] = useState(true);
   const [isPrivate, setIsPrivate] = useState(true);
   const [mutualCount, setMutualCount] = useState(0);
+  const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -97,14 +99,10 @@ export default function UserProfileScreen() {
       setAllowsRequests(allows);
       setIsPrivate(priv);
 
-      // Mutual follows only matter as a pre-follow signal; skip once
-      // following, and fail soft either way.
-      if (!state.iFollow) {
-        fetchMutualFollowsCount(currentUserId, id).then(setMutualCount).catch(() => {});
-      } else {
-        setMutualCount(0);
-      }
-
+      // Non-fatal, shown as a stat row regardless of follow state — fail
+      // soft so a hiccup here never blocks the rest of the profile.
+      fetchFollowCounts(id).then(setFollowCounts).catch(() => {});
+      fetchMutualFollowsCount(currentUserId, id).then(setMutualCount).catch(() => {});
     } catch (e) {
       Alert.alert('Could not load this profile', e instanceof Error ? e.message : 'Unknown error.');
     } finally {
@@ -243,20 +241,27 @@ export default function UserProfileScreen() {
           </View>
         ) : null}
 
-        {!follow.iFollow && mutualCount > 0 ? (
-          <Text style={styles.mutualText}>
-            {mutualCount} mutual follow{mutualCount === 1 ? '' : 's'}
-          </Text>
-        ) : null}
+        <View style={styles.statRow}>
+          <AnimatedPressable style={styles.stat} onPress={() => router.push(`/follows?tab=followers&userId=${id}`)}>
+            <Text style={styles.statValue}>{followCounts.followers}</Text>
+            <Text style={styles.statLabel}>Followers</Text>
+          </AnimatedPressable>
+          <View style={styles.statDivider} />
+          <AnimatedPressable style={styles.stat} onPress={() => router.push(`/follows?tab=following&userId=${id}`)}>
+            <Text style={styles.statValue}>{followCounts.following}</Text>
+            <Text style={styles.statLabel}>Following</Text>
+          </AnimatedPressable>
+          <View style={styles.statDivider} />
+          <AnimatedPressable style={styles.stat} onPress={() => router.push(`/follows?tab=mutual&userId=${id}`)}>
+            <Text style={styles.statValue}>{mutualCount}</Text>
+            <Text style={styles.statLabel}>Mutual</Text>
+          </AnimatedPressable>
+        </View>
 
         {canSeeFullProfile ? (
           <>
-            <Text style={styles.location}>{profile.location || 'Location unknown (probably local)'}</Text>
-
-            <Text style={[styles.bio, !profile.legend && styles.placeholderText]}>
-              {profile.legend || "hasn't written a legend yet"}
-            </Text>
-
+            {profile.location ? <Text style={styles.location}>{profile.location}</Text> : null}
+            {profile.legend ? <Text style={styles.bio}>{profile.legend}</Text> : null}
             <SportTagsField editing={false} selected={profile.sportTags} />
           </>
         ) : (
@@ -338,7 +343,18 @@ function makeStyles(colors: ThemeColors) {
       backgroundColor: colors.borderSoft,
     },
     qrBannerText: { fontSize: 13, fontWeight: WEIGHT.medium, color: colors.text, textAlign: 'center' },
-    mutualText: { marginTop: 10, fontSize: 13, color: colors.blue, textAlign: 'center', fontWeight: WEIGHT.medium },
+    statRow: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      marginTop: 18,
+      backgroundColor: colors.borderSoft,
+      borderRadius: RADII.lg,
+      paddingVertical: 12,
+    },
+    stat: { flex: 1, alignItems: 'center', gap: 2 },
+    statDivider: { width: 1, backgroundColor: colors.border },
+    statValue: { fontSize: 17, fontWeight: WEIGHT.bold, color: colors.text },
+    statLabel: { fontSize: 11, color: colors.textSecondary },
     privateText: {
       marginTop: 14,
       fontSize: 14,
@@ -348,7 +364,6 @@ function makeStyles(colors: ThemeColors) {
     },
     location: { marginTop: 14, fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
     bio: { marginTop: 8, fontSize: 15, fontStyle: 'italic', color: colors.text, textAlign: 'center' },
-    placeholderText: { color: colors.textSecondary },
     actionRow: { marginTop: 18, alignItems: 'center' },
     followsYouText: { marginTop: 8, fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
     primaryButton: {
