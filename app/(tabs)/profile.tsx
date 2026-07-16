@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Archive, Bell, Bookmark, Download, Flame, MapPin, MessageCircle, RotateCcw, Rss, Settings, Users, X } from 'lucide-react-native';
+import { Archive, Bell, Bookmark, Download, MapPin, MessageCircle, RotateCcw, Rss, Settings, Users, X } from 'lucide-react-native';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -27,7 +27,6 @@ import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
-import { fetchActivityStreakWeeks } from '@/lib/activity-streak';
 import { errorMessage } from '@/lib/error-message';
 import { fetchMyUpcomingEvents, formatEventDate, type UpcomingEvent } from '@/lib/events';
 import { fetchFollowCounts } from '@/lib/follows';
@@ -55,25 +54,23 @@ export default function ProfileScreen() {
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [groupsCount, setGroupsCount] = useState(0);
   const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
-  const [streakWeeks, setStreakWeeks] = useState(0);
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
   const [similarPeople, setSimilarPeople] = useState<SimilarPerson[]>([]);
 
   const load = useCallback(async () => {
     if (!userId) return;
 
-    // All seven independent — fired together instead of one-by-one, so the
-    // screen is ready after the slowest single request rather than the sum
-    // of all of them. allSettled (not all) because the profile itself is the
-    // only fatal one; a badge/count/streak failing shouldn't block the rest.
-    const [profileResult, notifResult, followResult, groupsResult, featuredResult, streakResult, upcomingResult] =
+    // All independent — fired together instead of one-by-one, so the screen
+    // is ready after the slowest single request rather than the sum of all
+    // of them. allSettled (not all) because the profile itself is the only
+    // fatal one; a badge/count failing shouldn't block the rest.
+    const [profileResult, notifResult, followResult, groupsResult, featuredResult, upcomingResult] =
       await Promise.allSettled([
         fetchProfile(userId),
         fetchUnreadNotificationCount(userId),
         fetchFollowCounts(userId),
         fetchMyGroupsCount(userId),
         fetchFeaturedPosts(userId),
-        fetchActivityStreakWeeks(userId),
         fetchMyUpcomingEvents(userId),
       ]);
 
@@ -94,7 +91,6 @@ export default function ProfileScreen() {
     if (followResult.status === 'fulfilled') setFollowCounts(followResult.value);
     if (groupsResult.status === 'fulfilled') setGroupsCount(groupsResult.value);
     if (featuredResult.status === 'fulfilled') setFeaturedPosts(featuredResult.value);
-    if (streakResult.status === 'fulfilled') setStreakWeeks(streakResult.value);
     if (upcomingResult.status === 'fulfilled') setUpcomingEvents(upcomingResult.value);
 
     if (loadedProfile.gameDayType) {
@@ -180,26 +176,14 @@ export default function ProfileScreen() {
             </View>
           ) : null}
 
-          {/* Combined streak + game-day type pill — two lightweight identity
-              signals in one compact row instead of two separate blocks.
-              Streak hidden below 1 week (see lib/activity-streak.ts) rather
-              than showing a deflating "0-week streak". Tapping the type side
+          {/* Game-day type pill — a lightweight identity signal. Tapping it
               opens the share sheet if set, or the quiz if not taken yet. */}
-          {streakWeeks > 0 || profile.gameDayType ? (
+          {profile.gameDayType ? (
             <View style={styles.identityPill}>
-              {streakWeeks > 0 ? (
-                <View style={styles.identityPillItem}>
-                  <Flame size={13} color={colors.coral} strokeWidth={2} fill={colors.coral} />
-                  <Text style={styles.identityPillText}>{streakWeeks}-week streak</Text>
-                </View>
-              ) : null}
-              {streakWeeks > 0 && profile.gameDayType ? <View style={styles.identityPillDivider} /> : null}
-              {profile.gameDayType ? (
-                <AnimatedPressable style={styles.identityPillItem} onPress={() => setGameDayShareOpen(true)}>
-                  <GameDayBadge type={profile.gameDayType} size={15} />
-                  <Text style={styles.identityPillText}>{GAME_DAY_TYPES[profile.gameDayType].label}</Text>
-                </AnimatedPressable>
-              ) : null}
+              <AnimatedPressable style={styles.identityPillItem} onPress={() => setGameDayShareOpen(true)}>
+                <GameDayBadge type={profile.gameDayType} size={15} />
+                <Text style={styles.identityPillText}>{GAME_DAY_TYPES[profile.gameDayType].label}</Text>
+              </AnimatedPressable>
             </View>
           ) : null}
 
@@ -504,7 +488,6 @@ function makeStyles(colors: ThemeColors) {
     },
     identityPillItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     identityPillText: { fontSize: 12, fontWeight: WEIGHT.semibold, color: colors.text },
-    identityPillDivider: { width: 1, height: 12, backgroundColor: colors.border },
     gameDayEmptyLink: { fontSize: 12, color: colors.coral, textAlign: 'center', marginTop: 2 },
     name: { fontSize: 22, fontWeight: WEIGHT.bold, color: colors.text, textAlign: 'center' },
     locationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },

@@ -1,5 +1,9 @@
 import * as Haptics from 'expo-haptics';
+<<<<<<< HEAD
 import { MapPin, MessageCircle, MoreHorizontal } from 'lucide-react-native';
+=======
+import { MessageCircle, MoreHorizontal, Share2 } from 'lucide-react-native';
+>>>>>>> 9295c1b4fd9c78c5b0a6fd147d3ca32edea0fc18
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
@@ -41,6 +45,8 @@ type Props = {
   // Single tap on the media (double-tap still fires 🔥). Omit where the
   // card already IS the full-screen view.
   onOpenPost?: () => void;
+  // Show a share button in the footer — only pass this in the full post view.
+  showShare?: boolean;
 };
 
 function timeAgo(iso: string): string {
@@ -72,6 +78,7 @@ export function PostCard({
   onBlock,
   onReshare,
   onOpenPost,
+  showShare,
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -196,13 +203,19 @@ export function PostCard({
           counts={post.reactionCounts}
           active={post.myReactions}
           onToggle={onToggleReaction}
-          onOpenShare={() => setShareSheetOpen(true)}
         />
 
-        <Pressable style={styles.commentButton} onPress={onOpenComments} hitSlop={8}>
-          <MessageCircle size={16} color={colors.blue} strokeWidth={1.75} />
-          <Text style={styles.commentCount}>{post.commentCount}</Text>
-        </Pressable>
+        <View style={styles.footerRight}>
+          {showShare ? (
+            <Pressable onPress={() => setShareSheetOpen(true)} hitSlop={8}>
+              <Share2 size={16} color={colors.textSecondary} strokeWidth={1.75} />
+            </Pressable>
+          ) : null}
+          <Pressable style={styles.commentButton} onPress={onOpenComments} hitSlop={8}>
+            <MessageCircle size={16} color={colors.blue} strokeWidth={1.75} />
+            <Text style={styles.commentCount}>{post.commentCount}</Text>
+          </Pressable>
+        </View>
       </View>
 
       <ShareSheet
@@ -279,6 +292,7 @@ function makeStyles(colors: ThemeColors) {
     media: { width: '100%', aspectRatio: 1, backgroundColor: colors.borderSoft },
     caption: { fontSize: 14, color: colors.text, lineHeight: 19 },
     footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    footerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     commentButton: { flexDirection: 'row', alignItems: 'center', gap: 5 },
     commentCount: { fontSize: 12, fontWeight: WEIGHT.semibold, color: colors.blue },
   });

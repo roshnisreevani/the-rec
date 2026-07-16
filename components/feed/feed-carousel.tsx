@@ -16,14 +16,40 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { CARD_HEIGHT, CARD_WIDTH } from '@/components/feed/card-layout';
+import { FeedEndCard } from '@/components/feed/feed-end-card';
 import { errorMessage } from '@/lib/error-message';
 import { PositionDots } from '@/components/feed/position-dots';
 import { SessionPostCard } from '@/components/feed/session-post-card';
 import { ON_ACCENT, ON_DARK_SURFACE, RADII, WEIGHT } from '@/constants/style';
+import { useThemeColors } from '@/contexts/theme-context';
 import type { ReportReason } from '@/lib/moderation';
 import type { Post } from '@/lib/posts';
 import type { ReactionType } from '@/lib/reactions';
 import { sendPostToPosterDm } from '@/lib/send-to-banter';
+
+const MOTTOS = [
+  "Your friends were out here. Where were you? 👀",
+  "Everyone showed up. The Scoreboard's waiting on you. ⏳",
+  "This all happened without you. Just saying. 🤷",
+  "They played, they posted. Your move. 🏃",
+  "Your crew's got receipts. Do you? 📸",
+  "The squad's been cooking. You still ordering takeout? 👀",
+  "All this happened while you were thinking about it. 😬",
+  "Don't let your friends have all the highlights. 🎬",
+  "Everyone's got a story. What's yours? 🤔",
+  "The bench misses you less than the court does. 🪑",
+  "Your friends didn't sit this one out. Will you? 😤",
+  "This is what you missed. Don't miss the next one. 🔔",
+  "The group chat already saw this. Now show them yours. 💬",
+  "They showed up. They balled. They posted. Your turn. 💪",
+];
+
+function getDailyMotto(): string {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  return MOTTOS[dayOfYear % MOTTOS.length];
+}
 
 const H_SWIPE_THRESHOLD = 70;
 const V_SWIPE_THRESHOLD = 70;
@@ -85,6 +111,7 @@ export function FeedCarousel({
   onReshare,
 }: Props) {
   const router = useRouter();
+  const colors = useThemeColors();
   const [activeIndex, setActiveIndex] = useState(0);
   const [arrowDirection, setArrowDirection] = useState<'left' | 'right' | null>(null);
   const [banterMessage, setBanterMessage] = useState<string | null>(null);
@@ -96,7 +123,8 @@ export function FeedCarousel({
   const arrowScale = useSharedValue(0.6);
   const banterOpacity = useSharedValue(0);
 
-  const activePost = posts[activeIndex];
+  const isEndCard = activeIndex === posts.length;
+  const activePost = isEndCard ? null : posts[activeIndex];
 
   // Preload the adjacent posts' photos so they're already decoded and in
   // memory/disk cache by the time a swipe brings them into view — without
@@ -129,7 +157,7 @@ export function FeedCarousel({
   const triggerTransition = (direction: 'left' | 'right') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const leaving = posts[activeIndex];
-    onLeavePost(leaving.id, leaving.myReactions.includes('fire'));
+    if (leaving) onLeavePost(leaving.id, leaving.myReactions.includes('fire'));
 
     // Quick, single pop-and-fade via withTiming only — no spring-back, so
     // it can't read as part of any card-transition bounce.
@@ -157,6 +185,7 @@ export function FeedCarousel({
   };
 
   const handleSwipeUpToBanter = async () => {
+    if (!activePost) return;
     if (activePost.authorId === currentUserId) {
       showBanterBanner("That's your own post — no need to banter yourself");
       return;
@@ -177,7 +206,7 @@ export function FeedCarousel({
     }
   };
 
-  const canGoNext = activeIndex < posts.length - 1;
+  const canGoNext = activeIndex < posts.length; // posts.length is the end card slot
   const canGoPrev = activeIndex > 0;
 
   let pan = Gesture.Pan()
@@ -253,6 +282,8 @@ export function FeedCarousel({
 
   const nextPost = posts[activeIndex + 1] ?? null;
 
+  const dailyMotto = getDailyMotto();
+
   return (
     <View style={styles.wrap}>
       <View style={styles.dotsWrap}>
@@ -273,20 +304,24 @@ export function FeedCarousel({
 
         <GestureDetector gesture={pan}>
           <Animated.View style={[styles.activeCardWrap, cardStyle]}>
-            <SessionPostCard
-              post={activePost}
-              currentUserId={currentUserId}
-              isHot={isHot(activePost)}
-              isPostOfWeek={isPostOfWeek(activePost)}
-              streak={streak}
-              onToggleReaction={(type) => onToggleReaction(activePost.id, type)}
-              onOpenComments={() => onOpenComments(activePost.id)}
-              onOpenPost={() => router.push(`/post/${activePost.id}`)}
-              onDelete={() => onDelete(activePost)}
-              onReport={(reason) => onReport(activePost, reason)}
-              onBlock={() => onBlock(activePost)}
-              onReshare={() => onReshare(activePost)}
-            />
+            {isEndCard || !activePost ? (
+              <FeedEndCard />
+            ) : (
+              <SessionPostCard
+                post={activePost}
+                currentUserId={currentUserId}
+                isHot={isHot(activePost)}
+                isPostOfWeek={isPostOfWeek(activePost)}
+                streak={streak}
+                onToggleReaction={(type) => onToggleReaction(activePost.id, type)}
+                onOpenComments={() => onOpenComments(activePost.id)}
+                onOpenPost={() => router.push(`/post/${activePost.id}`)}
+                onDelete={() => onDelete(activePost)}
+                onReport={(reason) => onReport(activePost, reason)}
+                onBlock={() => onBlock(activePost)}
+                onReshare={() => onReshare(activePost)}
+              />
+            )}
           </Animated.View>
         </GestureDetector>
 
@@ -302,6 +337,10 @@ export function FeedCarousel({
           </Animated.View>
         ) : null}
       </View>
+
+      {!isEndCard ? (
+        <Text style={[styles.motto, { color: colors.textSecondary }]}>{dailyMotto}</Text>
+      ) : null}
     </View>
   );
 }
@@ -309,6 +348,14 @@ export function FeedCarousel({
 const styles = StyleSheet.create({
   wrap: { marginTop: 14, alignItems: 'center' },
   dotsWrap: { marginBottom: 10 },
+  motto: {
+    marginTop: 12,
+    fontSize: 16,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    lineHeight: 22,
+  },
   stage: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,

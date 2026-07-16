@@ -18,37 +18,3 @@ export async function recordActivityToday(userId: string): Promise<void> {
 
   if (error) console.warn('[activity-streak] could not log activity', error);
 }
-
-/** Monday-start ISO-ish week key for a given date, e.g. "2026-W29". Used only
- * to group activity days into weeks — doesn't need to be true ISO 8601, just
- * consistent. */
-function weekKey(date: Date): string {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  // getUTCDay(): 0 = Sunday..6 = Saturday. Shift so Monday = start of week.
-  const dayOfWeek = (d.getUTCDay() + 6) % 7;
-  d.setUTCDate(d.getUTCDate() - dayOfWeek);
-  return d.toISOString().slice(0, 10);
-}
-
-/**
- * Fetches the user's activity log and returns how many consecutive weeks
- * (including the current one) have at least one active day, walking
- * backward from this week. A gap of even one week breaks the streak.
- */
-export async function fetchActivityStreakWeeks(userId: string): Promise<number> {
-  const { data, error } = await supabase.from('activity_days').select('day').eq('user_id', userId);
-  if (error) throw error;
-
-  const activeWeeks = new Set((data ?? []).map((row) => weekKey(new Date(`${row.day}T00:00:00Z`))));
-
-  let streak = 0;
-  const cursor = new Date();
-  for (;;) {
-    const key = weekKey(cursor);
-    if (!activeWeeks.has(key)) break;
-    streak += 1;
-    cursor.setUTCDate(cursor.getUTCDate() - 7);
-  }
-
-  return streak;
-}
