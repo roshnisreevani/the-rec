@@ -1,13 +1,41 @@
 import { useRouter } from 'expo-router';
 import { Tabs } from 'expo-router';
 import { CirclePlus, Images, MessageSquare, User, Users } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
+import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
+import { fetchTotalUnreadCount } from '@/lib/banter';
+
+// Not tied to any one screen's focus (the badge should stay accurate no
+// matter which tab you're on), so this polls independently and a bit less
+// aggressively than the open chat screen's own 4s poll.
+const UNREAD_POLL_MS = 15000;
 
 export default function TabLayout() {
   const colors = useThemeColors();
   const router = useRouter();
+  const { session } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!session?.user.id) return;
+    let cancelled = false;
+    const poll = () => {
+      fetchTotalUnreadCount()
+        .then((count) => {
+          if (!cancelled) setUnreadCount(count);
+        })
+        .catch(() => {});
+    };
+    poll();
+    const timer = setInterval(poll, UNREAD_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [session?.user.id]);
 
   return (
     <Tabs
@@ -63,6 +91,8 @@ export default function TabLayout() {
         options={{
           title: 'Banter',
           tabBarIcon: ({ color }) => <MessageSquare size={24} color={color} strokeWidth={1.75} />,
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.coral },
         }}
       />
       {/*

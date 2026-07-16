@@ -1,9 +1,5 @@
 import * as Haptics from 'expo-haptics';
-<<<<<<< HEAD
-import { MapPin, MessageCircle, MoreHorizontal } from 'lucide-react-native';
-=======
-import { MessageCircle, MoreHorizontal, Share2 } from 'lucide-react-native';
->>>>>>> 9295c1b4fd9c78c5b0a6fd147d3ca32edea0fc18
+import { MapPin, MessageCircle, MoreHorizontal, Share2 } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {

@@ -11,6 +11,7 @@ import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { fetchInbox, messageTimeLabel, type InboxItem } from '@/lib/banter';
+import { errorMessage } from '@/lib/error-message';
 
 export default function BanterScreen() {
   const { session } = useAuth();
@@ -30,7 +31,7 @@ export default function BanterScreen() {
       try {
         setItems(await fetchInbox());
       } catch (e) {
-        Alert.alert('Could not load Banter', e instanceof Error ? e.message : 'Unknown error.');
+        Alert.alert('Could not load Banter', errorMessage(e));
       } finally {
         setLoading(false);
         setRefreshing(false);

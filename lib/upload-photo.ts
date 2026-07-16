@@ -36,3 +36,7 @@ export function uploadPickThreePhoto(userId: string, localUri: string): Promise<
 export function uploadAvatarPhoto(userId: string, localUri: string): Promise<string> {
   return uploadPhoto('avatars', userId, localUri);
 }
+
+export function uploadMessagePhoto(userId: string, localUri: string): Promise<string> {
+  return uploadPhoto('message-media', userId, localUri);
+}

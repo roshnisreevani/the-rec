@@ -9,6 +9,7 @@ import { RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { fetchMessageablePeople, getOrCreateDm, type MessageablePerson } from '@/lib/banter';
+import { errorMessage } from '@/lib/error-message';
 import { fetchBlockedEitherDirection } from '@/lib/moderation';
 
 export default function NewChatScreen() {
@@ -33,7 +34,7 @@ export default function NewChatScreen() {
         const result = await fetchMessageablePeople(userId, blocked);
         if (!cancelled) setPeople(result);
       } catch (e) {
-        if (!cancelled) Alert.alert('Could not load people', e instanceof Error ? e.message : 'Unknown error.');
+        if (!cancelled) Alert.alert('Could not load people', errorMessage(e));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -56,7 +57,7 @@ export default function NewChatScreen() {
       const conversationId = await getOrCreateDm(person.id);
       router.replace(`/chat/${conversationId}`);
     } catch (e) {
-      Alert.alert('Could not start chat', e instanceof Error ? e.message : 'Unknown error.');
+      Alert.alert('Could not start chat', errorMessage(e));
       setOpeningId(null);
     }
   };
