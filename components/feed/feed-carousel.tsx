@@ -1,4 +1,5 @@
 import { Image as ExpoImage } from 'expo-image';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -126,6 +127,7 @@ export function FeedCarousel({
   };
 
   const triggerTransition = (direction: 'left' | 'right') => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const leaving = posts[activeIndex];
     onLeavePost(leaving.id, leaving.myReactions.includes('fire'));
 
