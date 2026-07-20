@@ -83,6 +83,50 @@ async function uploadToGeminiFiles(
   return file.uri;
 }
 
+// A 503 ("model overloaded") or 429 (rate limited) is Gemini's shared
+// infrastructure being busy at that exact moment — not a problem with the
+// request itself, and often clears within a couple seconds. Rather than
+// failing the clip outright on the first one, this retries the same model
+// once, then falls back to gemini-flash-lite-latest (a separate serving
+// pool with its own, larger free-tier quota) before giving up entirely.
+// Any other error (bad request, malformed response, etc.) fails immediately
+// without burning quota on a doomed retry — that kind of error will fail
+// identically on every model/attempt.
+const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
+const RETRY_DELAY_MS = 1500;
+
+async function generateWithFallback(geminiApiKey: string, requestBody: Record<string, unknown>): Promise<unknown> {
+  let lastError: Error = new Error('Gemini request failed');
+
+  for (const model of GEMINI_MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      if (res.ok) return res.json();
+
+      const bodyText = await res.text();
+      lastError = new Error(`Gemini error (${model}): ${bodyText}`);
+
+      if (res.status !== 503 && res.status !== 429) {
+        throw lastError;
+      }
+      // else: overloaded/rate-limited — loop retries this model once more,
+      // then the outer loop moves on to the next model in GEMINI_MODELS.
+    }
+  }
+
+  throw lastError;
+}
+
 // Shared JSON contract every persona responds in — a verdict (score + punchy
 // one-liner, like a judge on a panel show) and a best-moment timestamp (the
 // single best/funniest instant in the clip) sit alongside the original
@@ -260,65 +304,54 @@ Deno.serve(async (req: Request) => {
       callbackLine(pastLines)
     );
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }, { file_data: { mime_type: contentType, file_uri: fileUri } }] }],
-          // gemini-flash-latest spends part of its output budget on internal
-          // reasoning before writing the actual answer — with maxOutputTokens
-          // too low, thinking alone can eat the whole budget and leave zero
-          // tokens for the real response (finishReason MAX_TOKENS, empty
-          // text), which looked like a total failure regardless of clip
-          // content. thinkingBudget: 0 turns reasoning off for this
-          // straightforward classification/description task, and the token
-          // ceiling is raised as a second safety margin.
-          generationConfig: {
-            maxOutputTokens: 2048,
-            temperature: 0.9,
-            responseMimeType: 'application/json',
-            // Relying on the prompt alone to produce well-formed JSON left
-            // us exposed to Gemini emitting an unescaped quote/control
-            // character inside a text field (broke JSON.parse partway
-            // through a string, e.g. "Expected ',' or '}'..."). responseSchema
-            // makes the API itself constrain and escape output to match this
-            // shape, which is a structural guarantee instead of a prompt hint.
-            responseSchema: {
-              type: 'OBJECT',
-              properties: {
-                sport: { type: 'STRING' },
-                overall: { type: 'STRING' },
-                verdict_score: { type: 'NUMBER' },
-                verdict_text: { type: 'STRING' },
-                best_moment_seconds: { type: 'NUMBER' },
-                notes: {
-                  type: 'ARRAY',
-                  items: {
-                    type: 'OBJECT',
-                    properties: {
-                      timestamp_seconds: { type: 'NUMBER' },
-                      text: { type: 'STRING' },
-                    },
-                    required: ['timestamp_seconds', 'text'],
-                  },
+    const geminiData = (await generateWithFallback(geminiApiKey, {
+      contents: [{ parts: [{ text: prompt }, { file_data: { mime_type: contentType, file_uri: fileUri } }] }],
+      // gemini-flash-latest (and flash-lite) spend part of their output
+      // budget on internal reasoning before writing the actual answer —
+      // with maxOutputTokens too low, thinking alone can eat the whole
+      // budget and leave zero tokens for the real response (finishReason
+      // MAX_TOKENS, empty text), which looked like a total failure
+      // regardless of clip content. thinkingBudget: 0 turns reasoning off
+      // for this straightforward classification/description task, and the
+      // token ceiling is raised as a second safety margin.
+      generationConfig: {
+        maxOutputTokens: 2048,
+        temperature: 0.9,
+        responseMimeType: 'application/json',
+        // Relying on the prompt alone to produce well-formed JSON left
+        // us exposed to Gemini emitting an unescaped quote/control
+        // character inside a text field (broke JSON.parse partway
+        // through a string, e.g. "Expected ',' or '}'..."). responseSchema
+        // makes the API itself constrain and escape output to match this
+        // shape, which is a structural guarantee instead of a prompt hint.
+        responseSchema: {
+          type: 'OBJECT',
+          properties: {
+            sport: { type: 'STRING' },
+            overall: { type: 'STRING' },
+            verdict_score: { type: 'NUMBER' },
+            verdict_text: { type: 'STRING' },
+            best_moment_seconds: { type: 'NUMBER' },
+            notes: {
+              type: 'ARRAY',
+              items: {
+                type: 'OBJECT',
+                properties: {
+                  timestamp_seconds: { type: 'NUMBER' },
+                  text: { type: 'STRING' },
                 },
+                required: ['timestamp_seconds', 'text'],
               },
-              required: ['overall', 'notes', 'verdict_score', 'verdict_text'],
             },
-            thinkingConfig: { thinkingBudget: 0 },
           },
-        }),
-      }
-    );
-
-    if (!geminiRes.ok) {
-      const detail = await geminiRes.text();
-      throw new Error(`Gemini error: ${detail}`);
-    }
-
-    const geminiData = await geminiRes.json();
+          required: ['overall', 'notes', 'verdict_score', 'verdict_text'],
+        },
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    })) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
+      promptFeedback?: { blockReason?: string };
+    };
     const candidate = geminiData?.candidates?.[0];
     const rawText: string | undefined = candidate?.content?.parts?.[0]?.text;
     if (!rawText) {
