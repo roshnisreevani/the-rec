@@ -1,4 +1,4 @@
-# The Rec
+# Pinnied
 
 A social app for your athletic journey — not your athletic performance.
 
@@ -10,7 +10,7 @@ Built for the casual athlete, not the elite one. Pickup basketball, a new pickle
 - **Serious athlete networks** (PlayersOnly, Sporty, Front Pack) — built around skill level, recruiting, and matchmaking for people who already identify as athletes; earnest in tone, not friend-group-first.
 - **General social media** (Instagram, TikTok) — sports content gets buried in an everything-feed, with no structure for tracking who's won the most pickup games this year.
 
-The Rec is a casual, funny, friend-group-centered space that celebrates showing up and trying something new — not just elite performance.
+Pinnied is a casual, funny, friend-group-centered space that celebrates showing up and trying something new — not just elite performance.
 
 ## Who it's for
 
@@ -20,31 +20,49 @@ The Rec is a casual, funny, friend-group-centered space that celebrates showing 
 
 ## App structure
 
-Four tabs: **Profile** (identity, upcoming games, game-day type), **Groups** (create/join, chat, RSVP), **Feed** (posts + search), **Banter** (dedicated trash-talk threads).
+Five tabs: **Profile** (identity, upcoming games, game-day type, AI Highlights), **Groups** (create/join, chat, RSVP, brackets, Open Games), a center **+** button (create a post), **Feed** (posts from people you follow), **Banter** (group + DM chat, trash-talk).
 
-## Current features (Profile tab)
+## Current features
 
-- Email/password auth via Supabase
-- Editable profile: name, location, bio ("my legend"), sport tags
-- Searchable, multi-select sport tags (135+ activities)
+**Profile**
+- Email/password auth via Supabase, with email verification
+- Editable profile: name, location, bio ("my legend"), sport tags (135+ activities, searchable multi-select)
 - Real profile photo upload
-- "Pick your 3" — user-uploaded photos with custom captions, alongside a Featured tab of posts promoted from Archive
-- Upcoming — next RSVP'd game pulled across all your groups
-- Game-day type — a short quiz that assigns a personality-style archetype, shown alongside a "people like you" link
+- "Pick your 3" photos (with captions), and a Featured tab of posts promoted from Archive — switchable via a tab toggle on your own profile
+- Upcoming — next RSVP'd game/event pulled across all your groups, plus a full My Schedule view
+- Game-day type — a short quiz that assigns a personality-style archetype
+- AI Highlights — upload a short clip and get AI commentary in one of four personas (Roast, Hype, Commentator, Critique), a score/verdict, timestamped notes you can tap to seek the video, and a private follow-up chat with the AI about your clip
 - "Roast me" — generates a random funny bio starter
 - Comic-style visual identity — ink outlines, hand-lettered headers, sticker-style badges
 
+**Groups**
+- Create/join groups, invites, group chat
+- Brackets for group tournaments
+- Discover — browse and join Open Games near you (location-based), with waitlists, approval requests, a game-day thread, and a post-game photo recap
+
+**Feed**
+- Post photos or videos, with sport tags and optional self-rating
+- Reactions and comments, reshare, save posts, and manual archive (soft-delete to a private Archive, not permanent)
+- Posts also age out of Feed into Archive on their own after a couple of days (each author's 2 most recent always stay visible); if your Following feed would otherwise look empty, a couple of naturally-aged-out posts are pulled back in so it doesn't feel dead
+- Share an AI Highlight clip to Feed as a "trading card" post with its persona badge and score
+- Report and block, for a safe space to post in
+
+**Banter**
+- Group and 1:1 chat, with reactions, replies/quoting, pinned messages, voice notes, image attachments, custom chat name/icon, and read receipts
+
+**Safety & account**
+- Report/block available on posts, comments, messages, game photos, and AI Highlights
+- In-app account deletion
+- Full privacy policy and terms of service, in-app
+
 ## Planned
 
-- **Groups** — create/join, real-time group chat, RSVP polls ("who's in"), rivalry tracking
-- **Feed** — posts, photo/video, sport-specific reactions, search
-- **Banter** — dedicated trash-talk threads per group, separate from post comments
-- **Rec Check** — dual front/back camera capture with a countdown, for candid game-day moments
 - Auto-generated recap cards (joke stats: MVP of Vibes, Most Air Balls)
 - Animated splash intro
+- Rec Check — dual front/back camera capture with a countdown, for candid game-day moments
 
 ## Tech stack
 
 - [Expo](https://expo.dev) (React Native), SDK 54, Expo Router
-- [Supabase](https://supabase.com) — auth, Postgres database, Storage
-
+- [Supabase](https://supabase.com) — auth, Postgres database, Storage, Edge Functions
+- [Google Gemini API](https://ai.google.dev) — AI Highlights commentary and chat
