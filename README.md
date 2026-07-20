@@ -55,12 +55,6 @@ Five tabs: **Profile** (identity, upcoming games, game-day type, AI Highlights),
 - In-app account deletion
 - Full privacy policy and terms of service, in-app
 
-## Planned
-
-- Auto-generated recap cards (joke stats: MVP of Vibes, Most Air Balls)
-- Animated splash intro
-- Rec Check — dual front/back camera capture with a countdown, for candid game-day moments
-
 ## Tech stack
 
 - [Expo](https://expo.dev) (React Native), SDK 54, Expo Router
