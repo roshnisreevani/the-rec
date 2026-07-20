@@ -121,8 +121,11 @@ export function FeedCarousel({
   const arrowScale = useSharedValue(0.6);
   const banterOpacity = useSharedValue(0);
 
-  const isEndCard = activeIndex === posts.length;
-  const activePost = isEndCard ? null : posts[activeIndex];
+  // If posts empties to zero while mounted (e.g. after a block), clamp the
+  // index so we never access posts[-1] or posts[undefined].
+  const safeIndex = posts.length === 0 ? 0 : Math.min(activeIndex, posts.length);
+  const isEndCard = posts.length === 0 || safeIndex === posts.length;
+  const activePost = isEndCard ? null : posts[safeIndex];
 
   // Preload the adjacent posts' photos so they're already decoded and in
   // memory/disk cache by the time a swipe brings them into view — without

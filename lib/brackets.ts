@@ -179,15 +179,31 @@ export async function createBracket(input: {
   const rounds = totalRounds(n);
 
   // Build round 1 matches: standard bracket pairing (1 vs last, 2 vs second-last…)
-  // with byes for odd participants
+  // with byes for non-power-of-2 counts. Track used indices to prevent a
+  // participant appearing in two matches when n is not a power of 2.
   const round1Matches: { participant_a_id: string | null; participant_b_id: string | null }[] = [];
   const matchCount = Math.pow(2, rounds - 1); // always a power of 2
+  const usedIndices = new Set<number>();
 
   for (let i = 0; i < matchCount; i++) {
     const aIdx = i;
     const bIdx = n - 1 - i;
-    const a = aIdx < n ? seededParticipants[aIdx].id : null;
-    const b = bIdx > aIdx && bIdx < n ? seededParticipants[bIdx].id : null;
+
+    // If aIdx is already taken (mirror of an earlier slot) → empty slot
+    if (aIdx >= n || usedIndices.has(aIdx)) {
+      round1Matches.push({ participant_a_id: null, participant_b_id: null });
+      continue;
+    }
+
+    usedIndices.add(aIdx);
+    const a = seededParticipants[aIdx].id;
+
+    let b: string | null = null;
+    if (bIdx > aIdx && bIdx < n && !usedIndices.has(bIdx)) {
+      usedIndices.add(bIdx);
+      b = seededParticipants[bIdx].id;
+    }
+
     round1Matches.push({ participant_a_id: a, participant_b_id: b });
   }
 
@@ -252,12 +268,20 @@ async function advanceWinnerInternal(
 
   if (!matchRow) return;
 
-  await supabase.from('bracket_matches').update({ winner_id: winnerId }).eq('id', matchRow.id);
+  const { error: winnerErr } = await supabase
+    .from('bracket_matches')
+    .update({ winner_id: winnerId })
+    .eq('id', matchRow.id);
+  if (winnerErr) throw new Error(errorMessage(winnerErr, 'Could not save match winner'));
 
   const nextRound = round + 1;
   if (nextRound > totalRoundsCount) {
     // Final — mark bracket completed
-    await supabase.from('brackets').update({ status: 'completed' }).eq('id', bracketId);
+    const { error: completeErr } = await supabase
+      .from('brackets')
+      .update({ status: 'completed' })
+      .eq('id', bracketId);
+    if (completeErr) throw new Error(errorMessage(completeErr, 'Could not mark bracket complete'));
     return;
   }
 
@@ -275,10 +299,11 @@ async function advanceWinnerInternal(
 
   if (!nextMatch) return;
 
-  await supabase
+  const { error: advanceErr } = await supabase
     .from('bracket_matches')
     .update(isSlotA ? { participant_a_id: winnerId } : { participant_b_id: winnerId })
     .eq('id', nextMatch.id);
+  if (advanceErr) throw new Error(errorMessage(advanceErr, 'Could not advance winner to next round'));
 }
 
 export async function reportMatchWinner(

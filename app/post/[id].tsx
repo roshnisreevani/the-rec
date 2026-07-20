@@ -189,7 +189,7 @@ export default function PostDetailScreen() {
                   onReshare={handleReshare}
                   showShare
                 />
-                {post.selfRating ? (
+                {post.selfRating && userId !== post.authorId ? (
                   <View style={styles.ratingWrap}>
                     <Text style={[styles.ratingLabel, { color: colors.textSecondary }]}>
                       Post-game rating

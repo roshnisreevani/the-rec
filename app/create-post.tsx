@@ -138,9 +138,8 @@ export default function CreatePostScreen() {
 
   const handleCaptionChange = (text: string) => {
     setCaption(text);
-    // Find the @word at the current cursor position
-    const before = text.slice(0, cursorPos);
-    const match = before.match(/@(\w*)$/);
+    // Search trailing @word from end of text — avoids stale cursorPos
+    const match = text.match(/@(\w*)$/);
     setMentionQuery(match ? match[1] : null);
   };
 
@@ -149,11 +148,9 @@ export default function CreatePostScreen() {
   };
 
   const handleMentionSelect = (user: FollowUser) => {
-    // Replace the @partial with @fullname and a trailing space
-    const before = caption.slice(0, cursorPos);
-    const after = caption.slice(cursorPos);
-    const replaced = before.replace(/@\w*$/, `@${user.name} `);
-    setCaption(replaced + after);
+    // Replace the trailing @partial in the full caption — no cursorPos needed
+    const replaced = caption.replace(/@\w*$/, `@${user.name} `);
+    setCaption(replaced);
     setMentionQuery(null);
   };
 
