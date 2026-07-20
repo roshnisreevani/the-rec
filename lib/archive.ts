@@ -12,7 +12,7 @@ import type { Post } from '@/lib/posts';
 // not a reaction to a discrete event, so it's computed here over whatever
 // posts were just fetched rather than stored/mutated in Postgres.
 export const ARCHIVE_WINDOW_DAYS = 2;
-export const ARCHIVE_FLOOR_COUNT = 5;
+export const ARCHIVE_FLOOR_COUNT = 2;
 
 export type PostWithArchiveStatus = Post & { isArchived: boolean };
 

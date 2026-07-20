@@ -8,7 +8,6 @@ import { uploadHighlightClipVideo } from '@/lib/upload-photo';
 export type HighlightMode = 'roast' | 'critique' | 'hype' | 'commentator';
 export type HighlightStatus = 'pending' | 'ready' | 'failed';
 export type HighlightVisibility = 'private' | 'profile' | 'feed';
-export type NarrationStatus = 'none' | 'pending' | 'ready' | 'failed';
 
 export type HighlightClip = {
   id: string;
@@ -21,8 +20,6 @@ export type HighlightClip = {
   verdictScore: number | null;
   verdictText: string | null;
   bestMomentSeconds: number | null;
-  narrationStatus: NarrationStatus;
-  narrationAudioUrl: string | null;
   status: HighlightStatus;
   errorMessage: string | null;
   visibility: HighlightVisibility;
@@ -54,8 +51,6 @@ type ClipRow = {
   verdict_score: number | null;
   verdict_text: string | null;
   best_moment_seconds: number | null;
-  narration_status: NarrationStatus;
-  narration_audio_url: string | null;
   status: HighlightStatus;
   error_message: string | null;
   visibility: HighlightVisibility;
@@ -75,8 +70,6 @@ function rowToClip(row: ClipRow): HighlightClip {
     verdictScore: row.verdict_score,
     verdictText: row.verdict_text,
     bestMomentSeconds: row.best_moment_seconds,
-    narrationStatus: row.narration_status,
-    narrationAudioUrl: row.narration_audio_url,
     status: row.status,
     errorMessage: row.error_message,
     visibility: row.visibility,
@@ -86,7 +79,7 @@ function rowToClip(row: ClipRow): HighlightClip {
 }
 
 const CLIP_SELECT =
-  'id, user_id, mode, sport, skill_level, video_url, overall_text, verdict_score, verdict_text, best_moment_seconds, narration_status, narration_audio_url, status, error_message, visibility, created_at, archived_at';
+  'id, user_id, mode, sport, skill_level, video_url, overall_text, verdict_score, verdict_text, best_moment_seconds, status, error_message, visibility, created_at, archived_at';
 
 /**
  * Uploads the clip and creates its row (status 'pending'), then fires the
@@ -129,19 +122,6 @@ export function retryHighlightAnalysis(clipId: string): Promise<{ error: Error |
   return supabase.functions.invoke('analyze-highlight-clip', { body: { clipId } }).then(
     ({ error }) => ({ error: error ? new Error(error.message) : null }),
     (e) => ({ error: e instanceof Error ? e : new Error('Could not start analysis') })
-  );
-}
-
-/**
- * User-triggered voice narration — turns the clip's persona commentary into
- * a short AI-voiced audio track. Fires the Edge Function and returns
- * immediately; caller polls fetchHighlightClip for narrationStatus to flip
- * to 'ready' (or 'failed'), same async pattern as the main analysis.
- */
-export function requestHighlightNarration(clipId: string): Promise<{ error: Error | null }> {
-  return supabase.functions.invoke('narrate-highlight-clip', { body: { clipId } }).then(
-    ({ error }) => ({ error: error ? new Error(error.message) : null }),
-    (e) => ({ error: e instanceof Error ? e : new Error('Could not start narration') })
   );
 }
 

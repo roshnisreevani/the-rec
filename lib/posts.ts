@@ -174,7 +174,40 @@ export async function fetchFeed(currentUserId: string | undefined, scope: FeedSc
   }
 
   const followingSet = new Set(followingIds);
-  return active.filter((p) => p.authorId === currentUserId || followingSet.has(p.authorId));
+  const followingPosts = active.filter((p) => p.authorId === currentUserId || followingSet.has(p.authorId));
+
+  // Feed's empty-ish state (under MIN_FEED_POSTS) gets backfilled with a
+  // few posts that aged out on their own — never ones the owner explicitly
+  // deleted/archived (archivedAt !== null stays excluded) — so a quiet Feed
+  // still has something in it instead of a blank screen. Purely a read-time
+  // fill: nothing is un-archived in the DB, this just re-surfaces a few for
+  // this one fetch.
+  if (followingPosts.length < MIN_FEED_POSTS) {
+    const withStatus = withArchiveStatus(allPosts);
+    const naturallyExpired = withStatus.filter(
+      (p) =>
+        p.isArchived &&
+        p.archivedAt === null &&
+        (p.authorId === currentUserId || followingSet.has(p.authorId)) &&
+        !followingPosts.some((fp) => fp.id === p.id)
+    );
+    const needed = MIN_FEED_POSTS - followingPosts.length;
+    const backfill = shuffle(naturallyExpired).slice(0, needed);
+    return [...followingPosts, ...backfill];
+  }
+
+  return followingPosts;
+}
+
+const MIN_FEED_POSTS = 3;
+
+function shuffle<T>(arr: T[]): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
 /**

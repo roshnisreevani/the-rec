@@ -1,21 +1,7 @@
 import { useEvent } from 'expo';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import {
-  Archive,
-  ChevronLeft,
-  Flame,
-  MessageCircleReply,
-  Mic,
-  Pause,
-  Play,
-  Send,
-  Sparkles,
-  Target,
-  X,
-  Zap,
-} from 'lucide-react-native';
+import { Archive, ChevronLeft, Flame, MessageCircleReply, Mic, MoreHorizontal, Send, Sparkles, Target, X, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -34,6 +20,7 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
+import { ContentMenu } from '@/components/moderation/content-menu';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { GOLD, ON_ACCENT, RADII, SPACING, TYPE, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
@@ -47,7 +34,6 @@ import {
   fetchHighlightMessages,
   fetchHighlightNotes,
   fetchHighlightReactions,
-  requestHighlightNarration,
   retryHighlightAnalysis,
   sendHighlightMessage,
   setHighlightVisibility,
@@ -61,6 +47,8 @@ import {
   type HighlightReaction,
   type HighlightVisibility,
 } from '@/lib/highlights';
+import { blockUser, reportContent, type ReportReason } from '@/lib/moderation';
+import { fetchProfile } from '@/lib/profile';
 
 const STUCK_PENDING_MS = 25000;
 // How far right an AI bubble needs to be dragged before it counts as
@@ -139,9 +127,10 @@ export default function HighlightDetailScreen() {
   const [comments, setComments] = useState<HighlightComment[]>([]);
   const [commentText, setCommentText] = useState('');
   const [commentSending, setCommentSending] = useState(false);
-  const narrationPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stuckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [authorName, setAuthorName] = useState('this user');
 
   const player = useVideoPlayer(clip?.videoUrl ?? null);
   const { status } = useEvent(player, 'statusChange', { status: player.status });
@@ -189,6 +178,15 @@ export default function HighlightDetailScreen() {
       load();
     }, [load])
   );
+
+  // Only needed for the report/block menu's "Block {authorName}" label, so
+  // only fetch once we know this isn't the viewer's own clip.
+  useEffect(() => {
+    if (!clip || !userId || clip.userId === userId) return;
+    fetchProfile(clip.userId)
+      .then((p) => setAuthorName(p.name || 'this user'))
+      .catch(() => {});
+  }, [clip, userId]);
 
   // If it's still pending after a while, stop pretending it's about to
   // finish any second and offer a manual retry instead of an infinite
@@ -338,36 +336,6 @@ export default function HighlightDetailScreen() {
     }
   };
 
-  // Fires narration, then polls fetchHighlightClip until narrationStatus
-  // flips to 'ready'/'failed' — mirrors the pending-analysis poll above.
-  const handleNarrate = async () => {
-    if (!id) return;
-    setClip((prev) => (prev ? { ...prev, narrationStatus: 'pending' } : prev));
-    const { error } = await requestHighlightNarration(id);
-    if (error) {
-      Alert.alert('Could not generate narration', error.message);
-      setClip((prev) => (prev ? { ...prev, narrationStatus: 'failed' } : prev));
-      return;
-    }
-    if (narrationPollRef.current) clearInterval(narrationPollRef.current);
-    narrationPollRef.current = setInterval(async () => {
-      const fetched = await fetchHighlightClip(id);
-      if (fetched && fetched.narrationStatus !== 'pending') {
-        setClip(fetched);
-        if (narrationPollRef.current) {
-          clearInterval(narrationPollRef.current);
-          narrationPollRef.current = null;
-        }
-      }
-    }, 2500);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (narrationPollRef.current) clearInterval(narrationPollRef.current);
-    };
-  }, []);
-
   const handleSendComment = async () => {
     const trimmed = commentText.trim();
     if (!trimmed || !id || !userId) return;
@@ -402,6 +370,35 @@ export default function HighlightDetailScreen() {
     ]);
   };
 
+  const handleReport = async (reason: ReportReason) => {
+    if (!clip || !userId) return;
+    try {
+      await reportContent(userId, 'highlight', clip.id, reason);
+      Alert.alert('Reported', "Thanks — we'll take a look.");
+    } catch (e) {
+      Alert.alert('Could not report', errorMessage(e));
+    }
+  };
+
+  const handleBlock = () => {
+    if (!clip || !userId) return;
+    Alert.alert(`Block ${authorName}?`, "You won't see each other's content anymore.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await blockUser(userId, clip.userId);
+            router.back();
+          } catch (e) {
+            Alert.alert('Could not block', errorMessage(e));
+          }
+        },
+      },
+    ]);
+  };
+
   if (loading || !clip) {
     return (
       <SafeAreaView style={styles.loading} edges={['top']}>
@@ -417,14 +414,27 @@ export default function HighlightDetailScreen() {
           <ChevronLeft size={24} color={colors.text} strokeWidth={2} />
         </AnimatedPressable>
         <Text style={styles.headerTitle}>{MODE_LABEL[clip.mode]}</Text>
-        {isReadonly ? (
-          <View style={{ width: 19 }} />
-        ) : (
+        {clip.userId === userId ? (
           <AnimatedPressable onPress={handleArchive} hitSlop={8}>
             <Archive size={19} color={colors.textSecondary} strokeWidth={2} />
           </AnimatedPressable>
+        ) : (
+          <AnimatedPressable onPress={() => setMenuOpen(true)} hitSlop={8}>
+            <MoreHorizontal size={19} color={colors.textSecondary} strokeWidth={2} />
+          </AnimatedPressable>
         )}
       </View>
+
+      <ContentMenu
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        canDelete={false}
+        showReportAndBlock
+        authorName={authorName}
+        onDelete={() => {}}
+        onReport={handleReport}
+        onBlock={handleBlock}
+      />
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -489,28 +499,6 @@ export default function HighlightDetailScreen() {
                 <Text style={styles.bestMomentText}>Jump to the best moment ({formatSeconds(clip.bestMomentSeconds)})</Text>
               </AnimatedPressable>
             ) : null}
-
-            {clip.narrationStatus === 'ready' && clip.narrationAudioUrl ? (
-              <NarrationPlayer uri={clip.narrationAudioUrl} colors={colors} styles={styles} />
-            ) : (
-              <AnimatedPressable
-                style={styles.narrateButton}
-                onPress={handleNarrate}
-                disabled={clip.narrationStatus === 'pending'}>
-                {clip.narrationStatus === 'pending' ? (
-                  <ActivityIndicator color={colors.textSecondary} size="small" />
-                ) : (
-                  <Mic size={14} color={colors.textSecondary} strokeWidth={2} />
-                )}
-                <Text style={styles.narrateButtonText}>
-                  {clip.narrationStatus === 'pending'
-                    ? 'Generating voice commentary...'
-                    : clip.narrationStatus === 'failed'
-                      ? 'Narration failed — try again'
-                      : 'Hear the AI say it'}
-                </Text>
-              </AnimatedPressable>
-            )}
 
             <View style={styles.notesWrap}>
               {notes.map((note) => (
@@ -750,50 +738,6 @@ function SwipeableAiBubble({ children, onSwipeReply }: { children: ReactNode; on
   );
 }
 
-/** Tap-to-play/pause bar for the generated narration track — same play/pause
- * pattern as Banter's voice notes (expo-audio's useAudioPlayer/status). */
-function NarrationPlayer({
-  uri,
-  colors,
-  styles,
-}: {
-  uri: string;
-  colors: ThemeColors;
-  styles: ReturnType<typeof makeStyles>;
-}) {
-  const player = useAudioPlayer(uri);
-  const status = useAudioPlayerStatus(player);
-
-  // Replayable every time, not just once: once a track finishes,
-  // status.playing goes false and currentTime sits at the end — pressing
-  // play again would otherwise do nothing (already "at the end"). Seeking
-  // back to 0 first whenever it's not currently playing and has reached
-  // (or is very near) the end makes every tap a full replay.
-  const handlePress = async () => {
-    if (status.playing) {
-      player.pause();
-      return;
-    }
-    if (status.duration > 0 && status.currentTime >= status.duration - 0.15) {
-      await player.seekTo(0);
-    }
-    player.play();
-  };
-
-  return (
-    <AnimatedPressable style={styles.narrateButton} onPress={handlePress}>
-      {status.playing ? (
-        <Pause size={14} color={colors.textSecondary} strokeWidth={2} />
-      ) : (
-        <Play size={14} color={colors.textSecondary} strokeWidth={2} />
-      )}
-      <Text style={styles.narrateButtonText}>
-        {status.playing ? 'Playing commentary...' : status.currentTime > 0 ? 'Play again' : 'Play voice commentary'}
-      </Text>
-    </AnimatedPressable>
-  );
-}
-
 function modeColor(key: 'coral' | 'blue' | 'gold', colors: ThemeColors): string {
   return key === 'gold' ? GOLD : colors[key];
 }
@@ -933,19 +877,6 @@ function makeStyles(colors: ThemeColors) {
       marginTop: 8,
     },
     bestMomentText: { fontSize: TYPE.caption, color: colors.textSecondary, fontWeight: WEIGHT.semibold },
-    narrateButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      alignSelf: 'flex-start',
-      marginTop: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: RADII.pill,
-      paddingHorizontal: 12,
-      paddingVertical: 7,
-    },
-    narrateButtonText: { fontSize: TYPE.caption, color: colors.textSecondary, fontWeight: WEIGHT.semibold },
     roastWrap: { marginTop: SPACING.xl, gap: 8 },
     roastReactionRow: { flexDirection: 'row', gap: 8 },
     roastReactionPill: {

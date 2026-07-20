@@ -199,9 +199,7 @@ Deno.serve(async (req: Request) => {
   // gate (that's a later, separate decision). Counts this clip too, so "2
   // free a day" means this can be at most the 2nd clip in the last 24h.
   //
-  // TEMP: disabled for testing — DAILY_CAP set to a very high number so it
-  // never actually blocks. Set it back to 2 before shipping.
-  const DAILY_CAP = 9999;
+  const DAILY_CAP = 2;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count } = await adminClient
     .from('highlight_clips')

@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-export type ContentType = 'post' | 'comment' | 'profile' | 'message' | 'game_photo';
+export type ContentType = 'post' | 'comment' | 'profile' | 'message' | 'game_photo' | 'highlight';
 export type ReportReason = 'spam' | 'harassment' | 'inappropriate' | 'fake_profile' | 'other';
 export type ReportStatus = 'pending' | 'reviewed' | 'resolved';
 
