@@ -12,7 +12,9 @@ import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { errorMessage } from '@/lib/error-message';
-import { fetchGroupPickEms, PICK_EM_COMMENT_API, type PickEm } from '@/lib/pickem';
+import { fetchGroupDetail } from '@/lib/groups';
+import { blockUser } from '@/lib/moderation';
+import { deletePickEm, fetchGroupPickEms, PICK_EM_COMMENT_API, type PickEm } from '@/lib/pickem';
 
 export default function PickEmScreen() {
   const { id } = useLocalSearchParams<{ id: string }>(); // group id
@@ -23,19 +25,30 @@ export default function PickEmScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [pickEms, setPickEms] = useState<PickEm[]>([]);
+  const [isGroupOwner, setIsGroupOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [commentsForId, setCommentsForId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id || !userId) return;
     try {
-      setPickEms(await fetchGroupPickEms(id, userId));
+      const [detail, fetchedPickEms] = await Promise.all([
+        fetchGroupDetail(id, userId),
+        fetchGroupPickEms(id, userId),
+      ]);
+      if (!detail) {
+        Alert.alert('Group not found', "This group doesn't exist or you're no longer a member.");
+        router.back();
+        return;
+      }
+      setIsGroupOwner(detail.group.myRole === 'owner');
+      setPickEms(fetchedPickEms);
     } catch (e) {
       Alert.alert('Could not load Pick’Em', errorMessage(e));
     } finally {
       setLoading(false);
     }
-  }, [id, userId]);
+  }, [id, userId, router]);
 
   useFocusEffect(
     useCallback(() => {
@@ -44,6 +57,47 @@ export default function PickEmScreen() {
   );
 
   const commentsTarget = pickEms.find((p) => p.id === commentsForId) ?? null;
+
+  // Confirm, then remove locally before the request completes; restore the
+  // list if the delete fails — same pattern as deleting a group post.
+  const handleDelete = (pickEm: PickEm) => {
+    Alert.alert('Delete this Pick’Em?', "This can't be undone.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const prev = pickEms;
+          setPickEms((list) => list.filter((p) => p.id !== pickEm.id));
+          try {
+            await deletePickEm(pickEm.id);
+          } catch (e) {
+            setPickEms(prev);
+            Alert.alert('Could not delete Pick’Em', errorMessage(e));
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleBlockCreator = (pickEm: PickEm) => {
+    if (!userId) return;
+    Alert.alert(`Block ${pickEm.createdByName}?`, "You won't see their posts or comments anymore.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await blockUser(userId, pickEm.createdBy);
+            load();
+          } catch (e) {
+            Alert.alert('Could not block user', errorMessage(e));
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView style={styles.flex} edges={['top']}>
@@ -74,8 +128,11 @@ export default function PickEmScreen() {
                 key={pickEm.id}
                 pickEm={pickEm}
                 currentUserId={userId ?? ''}
+                isGroupOwner={isGroupOwner}
                 onChanged={load}
                 onOpenComments={() => setCommentsForId(pickEm.id)}
+                onDelete={handleDelete}
+                onBlockCreator={handleBlockCreator}
               />
             ))
           )}

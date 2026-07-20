@@ -1,3 +1,4 @@
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
@@ -22,7 +23,9 @@ import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { errorMessage } from '@/lib/error-message';
 import { fetchGroupDetail, type GroupMember } from '@/lib/groups';
-import { createPickEm } from '@/lib/pickem';
+import { createPickEm, formatDeadline } from '@/lib/pickem';
+
+const DEFAULT_DEADLINE_LEAD_MS = 24 * 60 * 60 * 1000; // default to this time tomorrow, if enabled
 
 type SideChoice = 'a' | 'b' | null;
 
@@ -39,6 +42,12 @@ export default function CreatePickEmScreen() {
   const [sides, setSides] = useState<Record<string, SideChoice>>({});
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // Voting deadline is optional — off by default, matching existing
+  // Pick'Ems, which never have one.
+  const [hasDeadline, setHasDeadline] = useState(false);
+  const [deadline, setDeadline] = useState<Date>(() => new Date(Date.now() + DEFAULT_DEADLINE_LEAD_MS));
+  const [androidPicker, setAndroidPicker] = useState<'date' | 'time' | null>(null);
 
   useEffect(() => {
     if (!groupId || !userId) return;
@@ -67,6 +76,7 @@ export default function CreatePickEmScreen() {
         title: title.trim() || null,
         sideA,
         sideB,
+        expiresAt: hasDeadline ? deadline : null,
       });
       router.replace(`/group/pickem/${groupId}?highlight=${id}`);
     } catch (e) {
@@ -110,6 +120,48 @@ export default function CreatePickEmScreen() {
           <Text style={styles.hint}>
             Tap A or B to put a member on that side. Each side needs at least one.
           </Text>
+
+          <AnimatedPressable style={styles.deadlineToggleRow} onPress={() => setHasDeadline((v) => !v)}>
+            <View style={[styles.checkbox, hasDeadline && styles.checkboxChecked]}>
+              {hasDeadline ? <Text style={styles.checkboxMark}>✓</Text> : null}
+            </View>
+            <Text style={styles.deadlineToggleText}>Set a voting deadline (optional)</Text>
+          </AnimatedPressable>
+
+          {hasDeadline ? (
+            <View style={styles.deadlineField}>
+              {Platform.OS === 'ios' ? (
+                <DateTimePicker
+                  value={deadline}
+                  mode="datetime"
+                  minimumDate={new Date()}
+                  onChange={(_e, selected) => selected && setDeadline(selected)}
+                />
+              ) : (
+                <>
+                  <View style={styles.androidDateRow}>
+                    <AnimatedPressable style={styles.androidDateButton} onPress={() => setAndroidPicker('date')}>
+                      <Text style={styles.androidDateButtonText}>{formatDeadline(deadline.toISOString())}</Text>
+                    </AnimatedPressable>
+                    <AnimatedPressable style={styles.androidDateButton} onPress={() => setAndroidPicker('time')}>
+                      <Text style={styles.androidDateButtonText}>Set time</Text>
+                    </AnimatedPressable>
+                  </View>
+                  {androidPicker ? (
+                    <DateTimePicker
+                      value={deadline}
+                      mode={androidPicker}
+                      minimumDate={new Date()}
+                      onChange={(_e, selected) => {
+                        setAndroidPicker(null);
+                        if (selected) setDeadline(selected);
+                      }}
+                    />
+                  ) : null}
+                </>
+              )}
+            </View>
+          ) : null}
 
           {members.map((m) => {
             const side = sides[m.userId] ?? null;
@@ -181,6 +233,30 @@ function makeStyles(colors: ThemeColors) {
       color: colors.text,
     },
     hint: { fontSize: 12, color: colors.textSecondary },
+    deadlineToggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderRadius: 5,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkboxChecked: { backgroundColor: colors.coral, borderColor: colors.coral },
+    checkboxMark: { color: ON_ACCENT, fontSize: 12, fontWeight: WEIGHT.bold },
+    deadlineToggleText: { fontSize: 14, color: colors.text },
+    deadlineField: { marginTop: -4 },
+    androidDateRow: { flexDirection: 'row', gap: 10 },
+    androidDateButton: {
+      flex: 1,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: RADII.md,
+      paddingVertical: 10,
+    },
+    androidDateButtonText: { fontSize: 13, fontWeight: WEIGHT.semibold, color: colors.text },
     memberRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     avatar: { width: 34, height: 34, borderRadius: 17 },
     memberName: { flex: 1, fontSize: 14, fontWeight: WEIGHT.medium, color: colors.text },

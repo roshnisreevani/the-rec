@@ -1,5 +1,5 @@
 import type { CommentApi } from '@/components/feed/comments-section';
-import { fetchBlockedUserIds } from '@/lib/moderation';
+import { fetchBlockedUserIds, reportContent, type ReportReason } from '@/lib/moderation';
 import { type Comment } from '@/lib/posts';
 import { supabase } from '@/lib/supabase';
 
@@ -15,8 +15,10 @@ export type PickEm = {
   id: string;
   groupId: string;
   createdBy: string;
+  createdByName: string;
   title: string | null;
   createdAt: string;
+  expiresAt: string | null; // null = voting never closes
   sideA: PickEmPerson[];
   sideB: PickEmPerson[];
   votesA: number;
@@ -34,6 +36,21 @@ type ParticipantRow = {
 
 type VoteRow = { pick_em_id: string; voter_id: string; side: PickEmSide };
 
+/** Voting is closed once the deadline has passed. The database enforces the
+ * same rule on vote writes (see the pickem moderation/expiry migration);
+ * this is the client-side mirror for immediate UI feedback. */
+export function isExpired(pickEm: Pick<PickEm, 'expiresAt'>): boolean {
+  return pickEm.expiresAt !== null && new Date(pickEm.expiresAt).getTime() <= Date.now();
+}
+
+export function formatDeadline(iso: string): string {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString(
+    undefined,
+    { hour: 'numeric', minute: '2-digit' }
+  )}`;
+}
+
 function toPerson(r: ParticipantRow): PickEmPerson {
   return {
     userId: r.user_id,
@@ -47,17 +64,21 @@ function toPerson(r: ParticipantRow): PickEmPerson {
 export async function fetchGroupPickEms(groupId: string, userId: string): Promise<PickEm[]> {
   const { data: pickEmRows, error } = await supabase
     .from('pick_ems')
-    .select('id, group_id, created_by, title, created_at')
+    .select(
+      'id, group_id, created_by, title, created_at, expires_at, creator:profiles!pick_ems_created_by_fkey(name)'
+    )
     .eq('group_id', groupId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  const pickEms = (pickEmRows ?? []) as {
+  const pickEms = (pickEmRows ?? []) as unknown as {
     id: string;
     group_id: string;
     created_by: string;
     title: string | null;
     created_at: string;
+    expires_at: string | null;
+    creator: { name: string | null } | null;
   }[];
   if (pickEms.length === 0) return [];
 
@@ -83,8 +104,10 @@ export async function fetchGroupPickEms(groupId: string, userId: string): Promis
       id: p.id,
       groupId: p.group_id,
       createdBy: p.created_by,
+      createdByName: p.creator?.name?.trim() || 'Nameless legend',
       title: p.title,
       createdAt: p.created_at,
+      expiresAt: p.expires_at,
       sideA: parts.filter((r) => r.side === 'a').map(toPerson),
       sideB: parts.filter((r) => r.side === 'b').map(toPerson),
       votesA: pickEmVotes.filter((v) => v.side === 'a').length,
@@ -104,10 +127,16 @@ export async function createPickEm(input: {
   title: string | null;
   sideA: string[];
   sideB: string[];
+  expiresAt?: Date | null; // optional voting deadline
 }): Promise<string> {
   const { data, error } = await supabase
     .from('pick_ems')
-    .insert({ group_id: input.groupId, created_by: input.createdBy, title: input.title })
+    .insert({
+      group_id: input.groupId,
+      created_by: input.createdBy,
+      title: input.title,
+      expires_at: input.expiresAt ? input.expiresAt.toISOString() : null,
+    })
     .select('id')
     .single();
   if (error) throw error;
@@ -123,8 +152,27 @@ export async function createPickEm(input: {
   return pickEmId;
 }
 
+/** Delete a matchup. RLS allows only the creator or the group owner; the
+ * participants, votes, comments, and comment likes cascade away with it. */
+export async function deletePickEm(pickEmId: string): Promise<void> {
+  const { error } = await supabase.from('pick_ems').delete().eq('id', pickEmId);
+  if (error) throw error;
+}
+
+/** Reports a Pick'Em (reuses the shared `reports` table used across the
+ * app). Only visible to the reporter and admins reviewing reports directly
+ * in the database — filing a report never hides or removes the matchup. */
+export async function reportPickEm(
+  reporterId: string,
+  pickEmId: string,
+  reason: ReportReason,
+  details?: string | null
+): Promise<void> {
+  await reportContent(reporterId, 'pick_em', pickEmId, reason, details);
+}
+
 /** Cast or change the current user's vote. RLS refuses votes from the
- * matchup's own participants. */
+ * matchup's own participants, and after the deadline has passed. */
 export async function votePickEm(pickEmId: string, voterId: string, side: PickEmSide): Promise<void> {
   const { error } = await supabase
     .from('pick_em_votes')

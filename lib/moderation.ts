@@ -1,7 +1,14 @@
 import { supabase } from '@/lib/supabase';
 
-export type ContentType = 'post' | 'comment' | 'profile' | 'message' | 'game_photo' | 'highlight';
-export type ReportReason = 'spam' | 'harassment' | 'inappropriate' | 'fake_profile' | 'other';
+export type ContentType = 'post' | 'comment' | 'profile' | 'message' | 'game_photo' | 'highlight' | 'pick_em';
+export type ReportReason =
+  | 'spam'
+  | 'harassment'
+  | 'hate_speech'
+  | 'inappropriate'
+  | 'misinformation'
+  | 'fake_profile'
+  | 'other';
 export type ReportStatus = 'pending' | 'reviewed' | 'resolved';
 
 export type BlockedUser = {
@@ -19,18 +26,29 @@ export type MyReport = {
   createdAt: string;
 };
 
+/**
+ * Files a report. Upserts on (reporter_id, content_type, content_id) — the
+ * unique index added in the pickem moderation migration means re-reporting
+ * the same item updates that report instead of failing on a duplicate key.
+ * `details` carries the free-text explanation used with the "other" reason.
+ */
 export async function reportContent(
   reporterId: string,
   contentType: ContentType,
   contentId: string,
-  reason: ReportReason
+  reason: ReportReason,
+  details?: string | null
 ): Promise<void> {
-  const { error } = await supabase.from('reports').insert({
-    reporter_id: reporterId,
-    content_type: contentType,
-    content_id: contentId,
-    reason,
-  });
+  const { error } = await supabase.from('reports').upsert(
+    {
+      reporter_id: reporterId,
+      content_type: contentType,
+      content_id: contentId,
+      reason,
+      details: details?.trim() || null,
+    },
+    { onConflict: 'reporter_id,content_type,content_id' }
+  );
   if (error) throw error;
 }
 
