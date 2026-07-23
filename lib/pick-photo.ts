@@ -55,33 +55,36 @@ export function pickMedia(): Promise<PickedMedia | null> {
   });
 }
 
-// videoMaxDuration only reliably trims freshly-recorded video on most
-// devices — picking an existing video from the library can slip past it
-// entirely, which is how a multi-minute recorded match clip once got all
-// the way to the analyze function and crashed it (out of memory trying to
-// hold the whole thing at once). This is the actual enforcement point.
-const MAX_CLIP_SECONDS = 20;
+// Clips that come back longer than 15s no longer get flat-out rejected —
+// instead the caller (create-highlight.tsx) routes them to a trim screen
+// where the user drags a 15s window over the clip, the same way iOS Photos
+// lets you trim a video. Anything genuinely absurd (a multi-minute recorded
+// match) is still rejected outright rather than handed to the trim UI,
+// since that's clearly not someone trying to select a highlight moment and
+// would mean downloading/scrubbing a huge file on-device for nothing.
+const ABSOLUTE_MAX_CLIP_SECONDS = 10 * 60;
+export const TARGET_CLIP_SECONDS = 15;
 
-function checkClipLength(asset: ImagePicker.ImagePickerAsset): boolean {
+function rejectIfAbsurd(asset: ImagePicker.ImagePickerAsset): boolean {
   const durationMs = asset.duration ?? 0;
-  if (durationMs > MAX_CLIP_SECONDS * 1000) {
-    Alert.alert(
-      'Clip is too long',
-      `Keep it to about ${MAX_CLIP_SECONDS} seconds — try trimming it first or picking a shorter moment.`
-    );
+  if (durationMs > ABSOLUTE_MAX_CLIP_SECONDS * 1000) {
+    Alert.alert('Clip is way too long', 'Pick something closer to a single highlight moment, not a full recording.');
     return false;
   }
   return true;
 }
 
+export type PickedVideoClip = { uri: string; durationSeconds: number };
+
 /**
- * Video-only picker for Highlights — caps recording/selection at 15s so
- * clips stay quick to analyze and match the "short highlight" vibe rather
- * than a full recorded game.
+ * Video-only picker for Highlights. Returns the picked clip's duration
+ * alongside its URI so the caller can decide whether it needs trimming
+ * (anything over TARGET_CLIP_SECONDS) — this picker itself no longer
+ * enforces the 15s cap, it just guards against wildly oversized files.
  */
-export function pickVideoClip(): Promise<string | null> {
+export function pickVideoClip(): Promise<PickedVideoClip | null> {
   return new Promise((resolve) => {
-    Alert.alert('Add a clip', 'Keep it to about 15 seconds.', [
+    Alert.alert('Add a clip', 'Pick a moment — you can trim it to 15 seconds next.', [
       { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
       {
         text: 'Record',
@@ -92,16 +95,20 @@ export function pickVideoClip(): Promise<string | null> {
             resolve(null);
             return;
           }
+          // 60s ceiling on recording (not TARGET_CLIP_SECONDS) so users can
+          // record a natural take and trim the best 15s out of it afterward
+          // instead of having to nail the exact moment live.
           const result = await ImagePicker.launchCameraAsync({
             mediaTypes: ['videos'],
-            videoMaxDuration: 15,
+            videoMaxDuration: 60,
             quality: 0.7,
           });
           if (result.canceled) {
             resolve(null);
             return;
           }
-          resolve(checkClipLength(result.assets[0]) ? result.assets[0].uri : null);
+          const asset = result.assets[0];
+          resolve(rejectIfAbsurd(asset) ? { uri: asset.uri, durationSeconds: (asset.duration ?? 0) / 1000 } : null);
         },
       },
       {
@@ -115,14 +122,14 @@ export function pickVideoClip(): Promise<string | null> {
           }
           const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['videos'],
-            videoMaxDuration: 15,
             quality: 0.7,
           });
           if (result.canceled) {
             resolve(null);
             return;
           }
-          resolve(checkClipLength(result.assets[0]) ? result.assets[0].uri : null);
+          const asset = result.assets[0];
+          resolve(rejectIfAbsurd(asset) ? { uri: asset.uri, durationSeconds: (asset.duration ?? 0) / 1000 } : null);
         },
       },
     ]);

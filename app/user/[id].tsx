@@ -23,6 +23,7 @@ import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { fetchAllowsConnectionRequests, fetchIsPrivate } from '@/lib/connections';
+import { errorMessage } from '@/lib/error-message';
 import {
   fetchFollowCounts,
   fetchFollowState,
@@ -104,7 +105,7 @@ export default function UserProfileScreen() {
       fetchFollowCounts(id).then(setFollowCounts).catch(() => {});
       fetchMutualFollowsCount(currentUserId, id).then(setMutualCount).catch(() => {});
     } catch (e) {
-      Alert.alert('Could not load this profile', e instanceof Error ? e.message : 'Unknown error.');
+      Alert.alert('Could not load this profile', errorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -128,7 +129,7 @@ export default function UserProfileScreen() {
       setFollow((prev) => ({ ...prev, iFollow: true }));
       await load();
     } catch (e) {
-      Alert.alert('Could not follow', e instanceof Error ? e.message : 'Unknown error.');
+      Alert.alert('Could not follow', errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -144,7 +145,7 @@ export default function UserProfileScreen() {
       setFollow((prev) => ({ ...prev, iFollow: false }));
       await load();
     } catch (e) {
-      Alert.alert('Could not unfollow', e instanceof Error ? e.message : 'Unknown error.');
+      Alert.alert('Could not unfollow', errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -156,7 +157,7 @@ export default function UserProfileScreen() {
       await reportContent(currentUserId, 'profile', id, reason);
       Alert.alert('Reported', "Thanks for flagging this — we'll take a look.");
     } catch (e) {
-      Alert.alert('Could not send report', e instanceof Error ? e.message : 'Unknown error.');
+      Alert.alert('Could not send report', errorMessage(e));
     }
   };
 
@@ -172,7 +173,7 @@ export default function UserProfileScreen() {
             await blockUser(currentUserId, id);
             router.back();
           } catch (e) {
-            Alert.alert('Could not block user', e instanceof Error ? e.message : 'Unknown error.');
+            Alert.alert('Could not block user', errorMessage(e));
           }
         },
       },

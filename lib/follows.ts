@@ -139,36 +139,86 @@ export type SuggestedPerson = {
 /**
  * "Suggested for you" — powers Discover's cold-start layer, since a small
  * user base means the Following/Discover feeds otherwise look identical.
- * There's no real ranking signal yet (no interests graph, no activity
- * score), so this pulls a batch of people the user isn't already following
- * (and hasn't blocked either direction), and shuffles client-side so the
- * same faces don't pin themselves to the top of every Discover load.
+ *
+ * Ranked by two real "you probably know them" signals instead of a plain
+ * shuffle: shared Teams group membership (weighted highest — you've
+ * actually crossed paths) and mutual follows (people followed by people you
+ * already follow — the classic "friend of a friend" signal). Anyone scoring
+ * on either gets ranked above the rest; ties are shuffled so the same faces
+ * don't camp the top of every load. If there aren't enough scored
+ * candidates to fill `limit`, the remainder is backfilled from a random
+ * pool of everyone else not already excluded — same as the old behavior,
+ * just now a fallback instead of the whole story.
  */
 export async function fetchSuggestedPeople(userId: string, limit = 8): Promise<SuggestedPerson[]> {
-  const [{ data, error }, followingIds, blockedIds] = await Promise.all([
-    supabase.from('profiles').select('id, name, avatar_url, location').limit(50),
+  const [followingIds, blockedIds, myGroupRows] = await Promise.all([
     fetchFollowingIds(userId),
     fetchBlockedEitherDirection(userId),
+    supabase.from('group_members').select('group_id').eq('user_id', userId),
   ]);
+  if (myGroupRows.error) throw myGroupRows.error;
 
-  if (error) throw error;
-
+  const myGroupIds = (myGroupRows.data ?? []).map((r) => r.group_id as string);
   const excluded = new Set([userId, ...followingIds, ...blockedIds]);
-  const candidates = (data ?? [])
-    .filter((row) => !excluded.has(row.id as string))
-    .map((row) => ({
-      id: row.id as string,
-      name: (row.name as string | null)?.trim() || 'Nameless legend',
-      avatarUrl: row.avatar_url as string | null,
-      location: (row.location as string | null) ?? '',
-    }));
 
-  // Fisher-Yates shuffle so refreshing Discover doesn't always show the same
-  // handful of people in the same order.
-  for (let i = candidates.length - 1; i > 0; i--) {
+  // Score accumulation: +2 per shared group, +1 per mutual follow. Shared
+  // groups outweighs mutual follows since it's a stronger "you've actually
+  // met" signal than a friend-of-a-friend edge.
+  const scores = new Map<string, number>();
+  const bump = (id: string, amount: number) => {
+    if (excluded.has(id)) return;
+    scores.set(id, (scores.get(id) ?? 0) + amount);
+  };
+
+  const [sharedGroupRes, mutualFollowRes] = await Promise.all([
+    myGroupIds.length > 0
+      ? supabase.from('group_members').select('user_id').in('group_id', myGroupIds)
+      : Promise.resolve({ data: [], error: null }),
+    followingIds.length > 0
+      ? supabase.from('follows').select('followee_id').in('follower_id', followingIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (sharedGroupRes.error) throw sharedGroupRes.error;
+  if (mutualFollowRes.error) throw mutualFollowRes.error;
+
+  for (const row of sharedGroupRes.data ?? []) bump(row.user_id as string, 2);
+  for (const row of mutualFollowRes.data ?? []) bump(row.followee_id as string, 1);
+
+  const scoredIds = Array.from(scores.keys());
+
+  const [scoredProfilesRes, poolRes] = await Promise.all([
+    scoredIds.length > 0
+      ? supabase.from('profiles').select('id, name, avatar_url, location').in('id', scoredIds)
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from('profiles').select('id, name, avatar_url, location').limit(50),
+  ]);
+  if (scoredProfilesRes.error) throw scoredProfilesRes.error;
+  if (poolRes.error) throw poolRes.error;
+
+  const toPerson = (row: { id: string; name: string | null; avatar_url: string | null; location: string | null }): SuggestedPerson => ({
+    id: row.id,
+    name: row.name?.trim() || 'Nameless legend',
+    avatarUrl: row.avatar_url,
+    location: row.location ?? '',
+  });
+
+  const ranked = (scoredProfilesRes.data ?? [])
+    .map((row) => toPerson(row as { id: string; name: string | null; avatar_url: string | null; location: string | null }))
+    .sort((a, b) => (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0));
+
+  if (ranked.length >= limit) return ranked.slice(0, limit);
+
+  // Backfill with the random pool, same shuffle-and-fill approach as
+  // before, skipping anyone already ranked above.
+  const rankedIds = new Set(ranked.map((p) => p.id));
+  const pool = (poolRes.data ?? [])
+    .filter((row) => !excluded.has(row.id as string) && !rankedIds.has(row.id as string))
+    .map((row) => toPerson(row as { id: string; name: string | null; avatar_url: string | null; location: string | null }));
+
+  for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    [pool[i], pool[j]] = [pool[j], pool[i]];
   }
 
-  return candidates.slice(0, limit);
+  return [...ranked, ...pool].slice(0, limit);
 }

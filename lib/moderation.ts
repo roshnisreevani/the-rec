@@ -1,6 +1,15 @@
 import { supabase } from '@/lib/supabase';
 
-export type ContentType = 'post' | 'comment' | 'profile' | 'message' | 'game_photo' | 'highlight' | 'pick_em';
+export type ContentType =
+  | 'post'
+  | 'comment'
+  | 'profile'
+  | 'message'
+  | 'game_photo'
+  | 'highlight'
+  | 'pick_em'
+  | 'highlight_comment'
+  | 'highlight_message';
 export type ReportReason =
   | 'spam'
   | 'harassment'

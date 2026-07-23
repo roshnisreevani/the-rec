@@ -25,6 +25,10 @@ export type HighlightClip = {
   visibility: HighlightVisibility;
   createdAt: string;
   archivedAt: string | null;
+  /** Start of the user-picked 15s window within the raw uploaded video, in seconds. Null = clip was already <=15s, play/analyze it in full. */
+  trimStartSeconds: number | null;
+  /** Optional short hint the user wrote ("airballed the free throw") fed directly into the AI prompt. */
+  extraContext: string | null;
 };
 
 export type HighlightNote = {
@@ -56,6 +60,8 @@ type ClipRow = {
   visibility: HighlightVisibility;
   created_at: string;
   archived_at: string | null;
+  trim_start_seconds: number | null;
+  extra_context: string | null;
 };
 
 function rowToClip(row: ClipRow): HighlightClip {
@@ -75,11 +81,13 @@ function rowToClip(row: ClipRow): HighlightClip {
     visibility: row.visibility,
     createdAt: row.created_at,
     archivedAt: row.archived_at,
+    trimStartSeconds: row.trim_start_seconds,
+    extraContext: row.extra_context,
   };
 }
 
 const CLIP_SELECT =
-  'id, user_id, mode, sport, skill_level, video_url, overall_text, verdict_score, verdict_text, best_moment_seconds, status, error_message, visibility, created_at, archived_at';
+  'id, user_id, mode, sport, skill_level, video_url, overall_text, verdict_score, verdict_text, best_moment_seconds, status, error_message, visibility, created_at, archived_at, trim_start_seconds, extra_context';
 
 /**
  * Uploads the clip and creates its row (status 'pending'), then fires the
@@ -92,6 +100,10 @@ export async function createHighlightClip(input: {
   mode: HighlightMode;
   sport: string | null;
   skillLevel: SkillLevel | null;
+  /** Start of the user-picked 15s trim window, in seconds — omit/null if the picked clip was already <=15s and needs no trim. */
+  trimStartSeconds?: number | null;
+  /** Optional short hint ("airballed the free throw") passed straight into the AI prompt to disambiguate what the clip/frames alone can't convey. */
+  extraContext?: string | null;
 }): Promise<string> {
   const videoUrl = await uploadHighlightClipVideo(input.userId, input.localVideoUri);
 
@@ -103,6 +115,8 @@ export async function createHighlightClip(input: {
       sport: input.sport,
       skill_level: input.skillLevel,
       video_url: videoUrl,
+      trim_start_seconds: input.trimStartSeconds ?? null,
+      extra_context: input.extraContext?.trim() || null,
     })
     .select('id')
     .single();

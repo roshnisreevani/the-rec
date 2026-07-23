@@ -2,27 +2,20 @@ import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { ChevronLeft, Flame, Mic, Pencil, Target, Video, Zap } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import { SportPickerField } from '@/components/create-post/sport-picker-field';
 import { GOLD, ON_ACCENT, RADII, SPACING, TYPE, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
 import { useThemeColors } from '@/contexts/theme-context';
 import { errorMessage } from '@/lib/error-message';
 import { createHighlightClip, type HighlightMode } from '@/lib/highlights';
 import type { SkillLevel } from '@/lib/open-games';
-import { pickVideoClip } from '@/lib/pick-photo';
+import { pickVideoClip, TARGET_CLIP_SECONDS } from '@/lib/pick-photo';
+import { SPORTS, type SportTag } from '@/lib/sports';
+import { awaitTrimResult } from '@/lib/trim-bridge';
 
 const SELF_SKILL_LABELS: Record<SkillLevel, string> = {
   beginner: 'Beginner',
@@ -61,14 +54,44 @@ export default function CreateHighlightScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [trimStartSeconds, setTrimStartSeconds] = useState<number | null>(null);
   const [mode, setMode] = useState<HighlightMode>('roast');
   const [skillLevel, setSkillLevel] = useState<SkillLevel>('all');
-  const [sport, setSport] = useState('');
+  // Search-as-you-type picker over ~130 sports (same one Feed post
+  // composer uses) instead of a fixed shortlist of chips — faster than
+  // typing free text, and gives Gemini/Groq one canonical name per sport
+  // instead of whatever casing/spelling a user happens to type.
+  const [sportValue, setSportValue] = useState<SportTag | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const sportLabel = sportValue ? SPORTS.find((s) => s.value === sportValue)?.label ?? null : null;
+
   const handlePickVideo = async () => {
-    const uri = await pickVideoClip();
-    if (uri) setVideoUri(uri);
+    const picked = await pickVideoClip();
+    if (!picked) return;
+
+    // Give a little slack above the exact target so a clip that's 15.3s
+    // (common — camera apps rarely land on an exact second) doesn't force
+    // the user through the trim screen for basically no reason.
+    if (picked.durationSeconds <= TARGET_CLIP_SECONDS + 0.5) {
+      setVideoUri(picked.uri);
+      setTrimStartSeconds(null);
+      return;
+    }
+
+    // Longer clip — hand off to the trim screen and wait for it to resolve
+    // (see lib/trim-bridge.ts). Cancelling the trim leaves the picker as if
+    // nothing happened, same as backing out of the pick-video Alert itself.
+    const trimPromise = awaitTrimResult();
+    router.push({
+      pathname: '/trim-highlight',
+      params: { uri: picked.uri, durationSeconds: String(picked.durationSeconds) },
+    });
+    const result = await trimPromise;
+    if (result) {
+      setVideoUri(result.uri);
+      setTrimStartSeconds(result.trimStartSeconds);
+    }
   };
 
   const handleSubmit = async () => {
@@ -83,8 +106,9 @@ export default function CreateHighlightScreen() {
         userId,
         localVideoUri: videoUri,
         mode,
-        sport: sport.trim() || null,
+        sport: sportLabel,
         skillLevel: mode === 'critique' ? skillLevel : null,
+        trimStartSeconds,
       });
       router.replace(`/highlight/${clipId}`);
     } catch (e) {
@@ -163,13 +187,8 @@ export default function CreateHighlightScreen() {
         ) : null}
 
         <Text style={styles.sectionTitle}>Sport (optional)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g. basketball — leave blank and we'll guess"
-          placeholderTextColor={colors.textSecondary}
-          value={sport}
-          onChangeText={setSport}
-        />
+        <SportPickerField value={sportValue} onChange={setSportValue} />
+        {!sportValue ? <Text style={styles.helperText}>Leave blank and we'll figure it out from the clip.</Text> : null}
 
         <AnimatedPressable style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
           {submitting ? (
@@ -269,16 +288,7 @@ function makeStyles(colors: ThemeColors) {
     pillSelected: { backgroundColor: colors.coral, borderColor: colors.coral },
     pillText: { fontSize: TYPE.label, fontWeight: WEIGHT.semibold, color: colors.text },
     pillTextSelected: { color: ON_ACCENT },
-    input: {
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: RADII.md,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      fontSize: TYPE.body,
-      color: colors.text,
-      backgroundColor: colors.background,
-    },
+    helperText: { fontSize: TYPE.caption, color: colors.textSecondary },
     submitButton: {
       backgroundColor: colors.coral,
       borderRadius: RADII.md,

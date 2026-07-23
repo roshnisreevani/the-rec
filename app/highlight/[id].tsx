@@ -20,7 +20,7 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
-import { ContentMenu } from '@/components/moderation/content-menu';
+import { ContentMenu, DEFAULT_REPORT_REASONS } from '@/components/moderation/content-menu';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { GOLD, ON_ACCENT, RADII, SPACING, TYPE, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useAuth } from '@/contexts/auth-context';
@@ -131,9 +131,40 @@ export default function HighlightDetailScreen() {
   const stuckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [authorName, setAuthorName] = useState('this user');
+  // Which comment's "..." menu is open, and the display name to show in its
+  // "Block {name}" option — resolved lazily on long-press since comments
+  // don't carry a joined profile name, mirroring authorName's lazy fetch above.
+  const [commentMenu, setCommentMenu] = useState<HighlightComment | null>(null);
+  const [commentMenuAuthorName, setCommentMenuAuthorName] = useState('this user');
 
   const player = useVideoPlayer(clip?.videoUrl ?? null);
   const { status } = useEvent(player, 'statusChange', { status: player.status });
+
+  // Trimmed clips upload the raw, untouched file — the 15s window the user
+  // picked in trim-highlight.tsx only exists as trimStartSeconds. Playback
+  // has to reproduce that trim itself: jump straight to the window's start
+  // once the player loads, and loop back to the start (rather than playing
+  // into the rest of the raw file) once playback crosses the 15s mark. AI
+  // note/best-moment timestamps are relative to this same window (the edge
+  // function trims before analyzing), so seeking there is trim start + N,
+  // not just N.
+  useEffect(() => {
+    if (clip?.trimStartSeconds == null) return;
+    if (status !== 'readyToPlay') return;
+    player.currentTime = clip.trimStartSeconds;
+  }, [status, clip?.trimStartSeconds, player]);
+
+  useEffect(() => {
+    if (clip?.trimStartSeconds == null) return;
+    const trimStart = clip.trimStartSeconds;
+    const trimEnd = trimStart + 15;
+    const sub = player.addListener('timeUpdate', (payload) => {
+      if (payload.currentTime >= trimEnd) {
+        player.currentTime = trimStart;
+      }
+    });
+    return () => sub.remove();
+  }, [clip?.trimStartSeconds, player]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -237,8 +268,12 @@ export default function HighlightDetailScreen() {
     };
   }, [clip?.status, load]);
 
+  // AI note/best-moment timestamps are relative to the trimmed 15s window
+  // (that's what Gemini/Groq actually saw), not the raw uploaded file — so
+  // seeking has to add trimStartSeconds back on top for a trimmed clip.
   const handleSeek = (seconds: number) => {
-    player.currentTime = seconds;
+    const offset = clip?.trimStartSeconds ?? 0;
+    player.currentTime = offset + seconds;
     player.play();
   };
 
@@ -399,6 +434,69 @@ export default function HighlightDetailScreen() {
     ]);
   };
 
+  // AI chat replies aren't authored by another user (no one to block), so
+  // this skips the ContentMenu bottom-sheet entirely and just asks the
+  // report reason directly — same reasons Feed/comments use.
+  const handleReportMessage = (message: HighlightMessage) => {
+    if (!userId) return;
+    Alert.alert(
+      'Report this AI reply?',
+      'What\'s wrong with it?',
+      [
+        ...DEFAULT_REPORT_REASONS.map((r) => ({
+          text: r.label,
+          onPress: async () => {
+            try {
+              await reportContent(userId, 'highlight_message', message.id, r.value);
+              Alert.alert('Reported', "Thanks — we'll take a look.");
+            } catch (e) {
+              Alert.alert('Could not report', errorMessage(e));
+            }
+          },
+        })),
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const openCommentMenu = (comment: HighlightComment) => {
+    setCommentMenu(comment);
+    setCommentMenuAuthorName('this user');
+    fetchProfile(comment.userId)
+      .then((p) => setCommentMenuAuthorName(p.name || 'this user'))
+      .catch(() => {});
+  };
+
+  const handleReportComment = async (reason: ReportReason) => {
+    if (!commentMenu || !userId) return;
+    try {
+      await reportContent(userId, 'highlight_comment', commentMenu.id, reason);
+      Alert.alert('Reported', "Thanks — we'll take a look.");
+    } catch (e) {
+      Alert.alert('Could not report', errorMessage(e));
+    }
+  };
+
+  const handleBlockCommenter = () => {
+    if (!commentMenu || !userId) return;
+    const targetId = commentMenu.userId;
+    Alert.alert(`Block ${commentMenuAuthorName}?`, "You won't see each other's content anymore.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await blockUser(userId, targetId);
+            setComments((prev) => prev.filter((c) => c.userId !== targetId));
+          } catch (e) {
+            Alert.alert('Could not block', errorMessage(e));
+          }
+        },
+      },
+    ]);
+  };
+
   if (loading || !clip) {
     return (
       <SafeAreaView style={styles.loading} edges={['top']}>
@@ -434,6 +532,17 @@ export default function HighlightDetailScreen() {
         onDelete={() => {}}
         onReport={handleReport}
         onBlock={handleBlock}
+      />
+
+      <ContentMenu
+        visible={commentMenu !== null}
+        onClose={() => setCommentMenu(null)}
+        canDelete={false}
+        showReportAndBlock={commentMenu?.userId !== userId}
+        authorName={commentMenuAuthorName}
+        onDelete={() => {}}
+        onReport={handleReportComment}
+        onBlock={handleBlockCommenter}
       />
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
@@ -518,53 +627,78 @@ export default function HighlightDetailScreen() {
 
             {!isReadonly ? (
               <>
-                <Text style={styles.chatLabel}>Private chat — only you see this. Swipe an AI reply right to respond to it.</Text>
-                <View style={styles.chatWrap}>
-                  {messages.map((m) =>
-                    m.sender === 'ai' ? (
-                      <SwipeableAiBubble key={m.id} onSwipeReply={() => setQuotedText(m.body)}>
-                        <View style={styles.bubbleAiRow}>
-                          <View style={[styles.aiAvatar, { backgroundColor: modeTint(clip.mode, colors) }]}>
-                            {(() => {
-                              const ModeIcon = MODE_ICON[clip.mode];
-                              return <ModeIcon size={12} color={modeColor(MODE_COLOR_KEY[clip.mode], colors)} strokeWidth={2} />;
-                            })()}
-                          </View>
-                          <View style={[styles.bubble, styles.bubbleAi, { backgroundColor: modeTint(clip.mode, colors) }]}>
-                            <Text style={styles.bubbleText}>{m.body}</Text>
-                          </View>
-                        </View>
-                      </SwipeableAiBubble>
-                    ) : (
-                      <View key={m.id} style={[styles.bubble, styles.bubbleUser]}>
-                        <Text style={[styles.bubbleText, styles.bubbleTextUser]}>{m.body}</Text>
-                      </View>
-                    )
+                <View style={styles.visibilityBadgeRow}>
+                  {clip.visibility === 'private' ? (
+                    <View style={styles.visibilityBadgePrivate}>
+                      <Text style={styles.visibilityBadgeTextPrivate}>🔒 Private</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.visibilityBadgePosted}>
+                      <Text style={styles.visibilityBadgeTextPosted}>
+                        ● Posted{clip.visibility === 'feed' ? ' to Feed' : ' to Profile'}
+                      </Text>
+                    </View>
                   )}
                 </View>
-                {quotedText ? (
-                  <View style={styles.quoteChip}>
-                    <Text style={styles.quoteChipText} numberOfLines={1}>
-                      Replying to: {quotedText}
-                    </Text>
-                    <AnimatedPressable hitSlop={8} onPress={() => setQuotedText(null)}>
-                      <X size={14} color={colors.textSecondary} strokeWidth={2} />
-                    </AnimatedPressable>
-                  </View>
-                ) : null}
-                <View style={styles.composer}>
-                  <TextInput
-                    style={styles.composerInput}
-                    placeholder={quotedText ? 'Reply to this...' : 'Ask a follow-up...'}
-                    placeholderTextColor={colors.textSecondary}
-                    value={messageText}
-                    onChangeText={setMessageText}
-                    maxLength={500}
-                  />
-                  <AnimatedPressable style={styles.sendButton} onPress={handleSend} disabled={sending || !messageText.trim()}>
-                    {sending ? <ActivityIndicator color={ON_ACCENT} size="small" /> : <Send size={16} color={ON_ACCENT} />}
-                  </AnimatedPressable>
-                </View>
+
+                {clip.visibility === 'private' ? (
+                  <>
+                    <Text style={styles.chatLabel}>Private chat — only you see this, full history. Swipe an AI reply right to respond to it, long-press to report it.</Text>
+                    <View style={styles.chatWrap}>
+                      {messages.map((m) =>
+                        m.sender === 'ai' ? (
+                          <SwipeableAiBubble key={m.id} onSwipeReply={() => setQuotedText(m.body)}>
+                            <AnimatedPressable
+                              style={styles.bubbleAiRow}
+                              onLongPress={() => handleReportMessage(m)}
+                              delayLongPress={350}>
+                              <View style={[styles.aiAvatar, { backgroundColor: modeTint(clip.mode, colors) }]}>
+                                {(() => {
+                                  const ModeIcon = MODE_ICON[clip.mode];
+                                  return <ModeIcon size={12} color={modeColor(MODE_COLOR_KEY[clip.mode], colors)} strokeWidth={2} />;
+                                })()}
+                              </View>
+                              <View style={[styles.bubble, styles.bubbleAi, { backgroundColor: modeTint(clip.mode, colors) }]}>
+                                <Text style={styles.bubbleText}>{m.body}</Text>
+                              </View>
+                            </AnimatedPressable>
+                          </SwipeableAiBubble>
+                        ) : (
+                          <View key={m.id} style={[styles.bubble, styles.bubbleUser]}>
+                            <Text style={[styles.bubbleText, styles.bubbleTextUser]}>{m.body}</Text>
+                          </View>
+                        )
+                      )}
+                    </View>
+                    {quotedText ? (
+                      <View style={styles.quoteChip}>
+                        <Text style={styles.quoteChipText} numberOfLines={1}>
+                          Replying to: {quotedText}
+                        </Text>
+                        <AnimatedPressable hitSlop={8} onPress={() => setQuotedText(null)}>
+                          <X size={14} color={colors.textSecondary} strokeWidth={2} />
+                        </AnimatedPressable>
+                      </View>
+                    ) : null}
+                    <View style={styles.composer}>
+                      <TextInput
+                        style={styles.composerInput}
+                        placeholder={quotedText ? 'Reply to this...' : 'Ask a follow-up...'}
+                        placeholderTextColor={colors.textSecondary}
+                        value={messageText}
+                        onChangeText={setMessageText}
+                        maxLength={500}
+                      />
+                      <AnimatedPressable style={styles.sendButton} onPress={handleSend} disabled={sending || !messageText.trim()}>
+                        {sending ? <ActivityIndicator color={ON_ACCENT} size="small" /> : <Send size={16} color={ON_ACCENT} />}
+                      </AnimatedPressable>
+                    </View>
+                  </>
+                ) : (
+                  <Text style={styles.chatLabel}>
+                    This clip is posted — the AI chat stays private and isn't shown here anymore, just the reviews above.
+                  </Text>
+                )}
 
                 <View style={styles.shareRow}>
                   <AnimatedPressable
@@ -576,7 +710,7 @@ export default function HighlightDetailScreen() {
                     </Text>
                   </AnimatedPressable>
                   <AnimatedPressable
-                    style={[styles.shareButton, clip.visibility === 'profile' && styles.shareButtonActive]}
+                    style={[styles.shareButton, clip.visibility === 'profile' && styles.shareButtonActivePosted]}
                     onPress={() => handleVisibility('profile')}
                     disabled={visibilityBusy}>
                     <Text style={[styles.shareButtonText, clip.visibility === 'profile' && styles.shareButtonTextActive]}>
@@ -584,7 +718,7 @@ export default function HighlightDetailScreen() {
                     </Text>
                   </AnimatedPressable>
                   <AnimatedPressable
-                    style={[styles.shareButton, clip.visibility === 'feed' && styles.shareButtonActive]}
+                    style={[styles.shareButton, clip.visibility === 'feed' && styles.shareButtonActivePosted]}
                     onPress={openShareReview}
                     disabled={visibilityBusy}>
                     <Text style={[styles.shareButtonText, clip.visibility === 'feed' && styles.shareButtonTextActive]}>
@@ -617,9 +751,13 @@ export default function HighlightDetailScreen() {
                 {comments.length > 0 ? (
                   <View style={styles.roastCommentsWrap}>
                     {comments.map((c) => (
-                      <View key={c.id} style={styles.roastCommentBubble}>
+                      <AnimatedPressable
+                        key={c.id}
+                        style={styles.roastCommentBubble}
+                        onLongPress={() => openCommentMenu(c)}
+                        delayLongPress={300}>
                         <Text style={styles.bubbleText}>{c.body}</Text>
-                      </View>
+                      </AnimatedPressable>
                     ))}
                   </View>
                 ) : null}
@@ -864,8 +1002,27 @@ function makeStyles(colors: ThemeColors) {
       alignItems: 'center',
     },
     shareButtonActive: { backgroundColor: colors.coral, borderColor: colors.coral },
+    // Distinct from "Keep private"'s coral active state — once a clip is
+    // actually posted (profile or feed) its active pill goes red so the two
+    // states read as visibly different, not just "which button is selected."
+    shareButtonActivePosted: { backgroundColor: colors.danger, borderColor: colors.danger },
     shareButtonText: { fontSize: TYPE.caption, fontWeight: WEIGHT.semibold, color: colors.text },
     shareButtonTextActive: { color: ON_ACCENT },
+    visibilityBadgeRow: { flexDirection: 'row', marginTop: SPACING.lg },
+    visibilityBadgePrivate: {
+      borderRadius: RADII.pill,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      backgroundColor: colors.border,
+    },
+    visibilityBadgeTextPrivate: { fontSize: TYPE.caption, fontWeight: WEIGHT.semibold, color: colors.textSecondary },
+    visibilityBadgePosted: {
+      borderRadius: RADII.pill,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      backgroundColor: colors.danger + '18',
+    },
+    visibilityBadgeTextPosted: { fontSize: TYPE.caption, fontWeight: WEIGHT.bold, color: colors.danger },
     verdictCard: { borderRadius: RADII.lg, padding: 14, marginTop: SPACING.lg, gap: 4 },
     verdictScore: { fontSize: TYPE.title, fontWeight: WEIGHT.bold },
     verdictText: { fontSize: TYPE.body, fontWeight: WEIGHT.semibold, color: colors.text, lineHeight: 21 },

@@ -183,7 +183,6 @@ export default function ProfileScreen() {
           <Text style={styles.name} numberOfLines={1}>
             {profile.name || 'Nameless legend'}
           </Text>
-
           {profile.legend ? <Text style={styles.bio}>{profile.legend}</Text> : null}
 
           {profile.location ? (

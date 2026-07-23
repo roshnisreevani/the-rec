@@ -44,26 +44,29 @@ export async function updateIsPrivate(userId: string, isPrivate: boolean): Promi
 }
 
 /**
- * Search people by name for the Find People screen. Excludes yourself and
- * anyone blocked in either direction (see fetchBlockedEitherDirection).
+ * Search people by display name OR the email they used to sign up, for the
+ * Find People screen. Email itself is never returned to the client — the
+ * search_people_by_query RPC (SECURITY DEFINER) matches against
+ * auth.users.email server-side and only returns non-sensitive profile
+ * fields. Excludes yourself and anyone blocked in either direction.
  */
 export async function searchPeople(currentUserId: string, query: string): Promise<PersonSearchResult[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
   const [{ data, error }, blockedIds] = await Promise.all([
-    supabase.from('profiles').select('id, name, avatar_url, location').ilike('name', `%${trimmed}%`).limit(20),
+    supabase.rpc('search_people_by_query', { p_query: trimmed }),
     fetchBlockedEitherDirection(currentUserId),
   ]);
 
   if (error) throw error;
 
   const blocked = new Set(blockedIds);
-  return (data ?? [])
+  return ((data ?? []) as { id: string; name: string | null; avatar_url: string | null; location: string | null }[])
     .filter((row) => row.id !== currentUserId && !blocked.has(row.id))
     .map((row) => ({
       id: row.id,
-      name: (row.name as string | null) ?? '',
+      name: row.name ?? '',
       avatarUrl: row.avatar_url,
       location: row.location ?? '',
     }));

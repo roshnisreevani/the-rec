@@ -66,10 +66,11 @@ export default function FindPeopleScreen() {
       <View style={styles.searchWrap}>
         <TextInput
           style={styles.input}
-          placeholder="Search by name"
+          placeholder="Search by name or email"
           placeholderTextColor={colors.textSecondary}
           value={query}
           onChangeText={setQuery}
+          autoCapitalize="none"
           autoFocus
         />
         {loading ? <ActivityIndicator color={colors.textSecondary} style={styles.spinner} /> : null}
