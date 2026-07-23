@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Tabs } from 'expo-router';
-import { CirclePlus, Images, MessageSquare, User, Users } from 'lucide-react-native';
+import { CirclePlus, Images, MessageSquare, Trophy, User, Users } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
@@ -67,6 +67,14 @@ export default function TabLayout() {
           title: 'Teams',
           tabBarActiveTintColor: colors.coral,
           tabBarIcon: ({ color }) => <Users size={24} color={color} strokeWidth={1.75} />,
+        }}
+      />
+      <Tabs.Screen
+        name="leagues"
+        options={{
+          title: 'Leagues',
+          tabBarActiveTintColor: colors.blue,
+          tabBarIcon: ({ color }) => <Trophy size={24} color={color} strokeWidth={1.75} />,
         }}
       />
       <Tabs.Screen

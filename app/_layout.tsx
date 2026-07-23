@@ -35,6 +35,7 @@ function RootNavigator() {
             <Stack.Screen name="edit-profile" options={{ headerShown: false, presentation: 'modal' }} />
             <Stack.Screen name="create-post" options={{ headerShown: false, presentation: 'modal' }} />
             <Stack.Screen name="create-group" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="create-league" options={{ headerShown: false, presentation: 'modal' }} />
             <Stack.Screen name="group/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="group/invite/[id]" options={{ headerShown: false, presentation: 'modal' }} />
             <Stack.Screen name="group/members/[id]" options={{ headerShown: false }} />
@@ -71,6 +72,18 @@ function RootNavigator() {
             <Stack.Screen name="group/pickem/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="group/pickem/create/[groupId]" options={{ headerShown: false }} />
             <Stack.Screen name="group/brackets/detail/[bracketId]" options={{ headerShown: false }} />
+            <Stack.Screen name="league/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="league/settings/[id]" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="league/teams/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="league/team/create/[id]" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="league/team/[teamId]" options={{ headerShown: false }} />
+            <Stack.Screen name="league/schedule/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="league/standings/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="league/announcements/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="league/stats/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="league/invite/[id]" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="league/join/[code]" options={{ headerShown: false }} />
+            <Stack.Screen name="league/members/[id]" options={{ headerShown: false }} />
           </Stack.Protected>
           <Stack.Protected guard={!isPasswordRecovery && !session}>
             <Stack.Screen name="auth" options={{ headerShown: false }} />

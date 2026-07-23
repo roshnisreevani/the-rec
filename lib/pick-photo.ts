@@ -4,6 +4,7 @@ import { Alert } from 'react-native';
 import type { MediaType } from '@/lib/posts';
 
 export type PickedMedia = { uri: string; type: MediaType };
+export type PickedImage = { uri: string; width: number; height: number };
 
 function toPickedMedia(result: ImagePicker.ImagePickerResult): PickedMedia | null {
   if (result.canceled) return null;
@@ -171,6 +172,55 @@ export function pickPhoto(): Promise<string | null> {
             quality: 0.7,
           });
           resolve(result.canceled ? null : result.assets[0].uri);
+        },
+      },
+    ]);
+  });
+}
+
+/**
+ * Freeform (no forced crop aspect) image picker for banner-style attachments
+ * like a Bulletin post's image — returns the source dimensions too so the
+ * caller can resize proportionally instead of guessing.
+ */
+export function pickImage(): Promise<PickedImage | null> {
+  return new Promise((resolve) => {
+    Alert.alert('Add a photo', undefined, [
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+      {
+        text: 'Take Photo',
+        onPress: async () => {
+          const permission = await ImagePicker.requestCameraPermissionsAsync();
+          if (!permission.granted) {
+            Alert.alert('No access', 'Need camera access to take a photo.');
+            resolve(null);
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({ quality: 0.9 });
+          if (result.canceled) {
+            resolve(null);
+            return;
+          }
+          const asset = result.assets[0];
+          resolve({ uri: asset.uri, width: asset.width, height: asset.height });
+        },
+      },
+      {
+        text: 'Choose from Library',
+        onPress: async () => {
+          const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!permission.granted) {
+            Alert.alert('No access', 'Need photo library access to choose a photo.');
+            resolve(null);
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
+          if (result.canceled) {
+            resolve(null);
+            return;
+          }
+          const asset = result.assets[0];
+          resolve({ uri: asset.uri, width: asset.width, height: asset.height });
         },
       },
     ]);
