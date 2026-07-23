@@ -26,9 +26,13 @@ type Props = {
   interactive?: boolean;
   onLocationChange?: (coords: { latitude: number; longitude: number }) => void;
   height?: number;
+  // Fills its parent instead of using a fixed height — used by the
+  // full-screen MapPickerModal, where the map is the entire background
+  // rather than a small embed sitting under a form field.
+  fill?: boolean;
 };
 
-export function GameMap({ latitude, longitude, interactive = false, onLocationChange, height = 180 }: Props) {
+export function GameMap({ latitude, longitude, interactive = false, onLocationChange, height = 180, fill = false }: Props) {
   const mapRef = useRef<MapView>(null);
 
   const initialRegion: Region = useMemo(
@@ -46,7 +50,7 @@ export function GameMap({ latitude, longitude, interactive = false, onLocationCh
   );
 
   return (
-    <View style={[styles.wrap, { height }]}>
+    <View style={fill ? styles.wrapFill : [styles.wrap, { height }]}>
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -81,5 +85,6 @@ export function GameMap({ latitude, longitude, interactive = false, onLocationCh
 
 const styles = StyleSheet.create({
   wrap: { width: '100%', borderRadius: RADII.lg, overflow: 'hidden' },
+  wrapFill: { flex: 1 },
   map: { flex: 1 },
 });

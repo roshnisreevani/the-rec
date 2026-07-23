@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { Plus, Users } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GroupCard } from '@/components/groups/group-card';
@@ -45,6 +45,10 @@ export default function GroupsScreen() {
   const [myGoingIds, setMyGoingIds] = useState<Set<string>>(new Set());
   const [gamesLoading, setGamesLoading] = useState(true);
   const [gamesError, setGamesError] = useState<string | null>(null);
+  // Distinguishes "you said no to the location prompt" from any other
+  // failure — that one specifically needs an "Open Settings" shortcut since
+  // re-requesting permission after a denial is a no-op on both platforms.
+  const [locationDenied, setLocationDenied] = useState(false);
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
 
@@ -73,12 +77,14 @@ export default function GroupsScreen() {
     if (!userId) return;
     setGamesLoading(true);
     setGamesError(null);
+    setLocationDenied(false);
     try {
       fetchIsVerified(userId).then(setIsVerified).catch(() => {});
 
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setGamesError('Location access is off — turn it on in Settings to see games near you.');
+        setLocationDenied(true);
         setGames([]);
         return;
       }
@@ -86,7 +92,17 @@ export default function GroupsScreen() {
       const fetched = await discoverOpenGames(position.coords.latitude, position.coords.longitude);
       setGames(fetched);
     } catch (e) {
-      setGamesError(errorMessage(e, 'Could not load games near you.'));
+      // Most failures here are transient (a slow/flaky location fix, a
+      // one-off network hiccup on the RPC) rather than a real dead end — so
+      // silently retry once before bothering the person with an error and a
+      // button to press. Only the second failure actually surfaces.
+      try {
+        const position = await Location.getCurrentPositionAsync({});
+        const fetched = await discoverOpenGames(position.coords.latitude, position.coords.longitude);
+        setGames(fetched);
+      } catch (e2) {
+        setGamesError(errorMessage(e2, 'Could not load games near you.'));
+      }
     } finally {
       setGamesLoading(false);
     }
@@ -196,6 +212,15 @@ export default function GroupsScreen() {
                 <Text style={styles.emptyText}>
                   {gamesError ?? 'Nobody has posted an open game near you yet — be the first.'}
                 </Text>
+                {gamesError ? (
+                  <AnimatedPressable
+                    style={styles.emptyActionButton}
+                    onPress={() => (locationDenied ? Linking.openSettings() : loadGames())}>
+                    <Text style={styles.emptyActionButtonText}>
+                      {locationDenied ? 'Open Settings' : 'Try again'}
+                    </Text>
+                  </AnimatedPressable>
+                ) : null}
               </View>
             }
             renderItem={({ item }) => (
@@ -345,6 +370,14 @@ function makeStyles(colors: ThemeColors) {
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 60, paddingHorizontal: 20 },
     emptyTitle: { fontSize: 17, fontWeight: WEIGHT.bold, color: colors.text, marginTop: 4 },
     emptyText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+    emptyActionButton: {
+      marginTop: 6,
+      backgroundColor: colors.coral,
+      borderRadius: RADII.pill,
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+    },
+    emptyActionButtonText: { fontSize: 14, fontWeight: WEIGHT.semibold, color: ON_ACCENT },
     emptyButton: {
       marginTop: 8,
       backgroundColor: colors.coral,

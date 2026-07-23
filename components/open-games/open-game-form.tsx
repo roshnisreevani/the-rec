@@ -1,8 +1,7 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
-import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { Calendar } from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,15 +15,16 @@ import {
   View,
 } from 'react-native';
 
+import { SportPickerField } from '@/components/create-post/sport-picker-field';
 import { GameMap } from '@/components/open-games/game-map';
+import { MapPickerModal } from '@/components/open-games/map-picker-modal';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { ON_ACCENT, RADII, WEIGHT, type ThemeColors } from '@/constants/style';
 import { useThemeColors } from '@/contexts/theme-context';
 import { errorMessage } from '@/lib/error-message';
 import { formatEventDate } from '@/lib/events';
-import { searchPlaces, type PlaceResult } from '@/lib/geocoding';
 import { SKILL_LEVEL_LABELS, type SkillLevel } from '@/lib/open-games';
-import { SPORTS } from '@/lib/sports';
+import { type SportTag } from '@/lib/sports';
 
 const SKILL_LEVELS: SkillLevel[] = ['all', 'beginner', 'competitive'];
 
@@ -59,7 +59,7 @@ export function OpenGameForm({ mode, initialValues, onSubmit }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const [sport, setSport] = useState(initialValues?.sport ?? '');
+  const [sport, setSport] = useState<SportTag | null>(initialValues?.sport ?? null);
   const [title, setTitle] = useState(initialValues?.title ?? '');
   const [description, setDescription] = useState(initialValues?.description ?? '');
   const [skillLevel, setSkillLevel] = useState<SkillLevel>(initialValues?.skillLevel ?? 'all');
@@ -69,7 +69,6 @@ export function OpenGameForm({ mode, initialValues, onSubmit }: Props) {
       ? { lat: initialValues.latitude, lng: initialValues.longitude }
       : null
   );
-  const [gettingLocation, setGettingLocation] = useState(false);
   const [maxSpots, setMaxSpots] = useState(initialValues?.maxSpots ? String(initialValues.maxSpots) : '');
   const [startsAt, setStartsAt] = useState<Date>(
     initialValues?.startsAt ? new Date(initialValues.startsAt) : defaultStartTime()
@@ -79,85 +78,7 @@ export function OpenGameForm({ mode, initialValues, onSubmit }: Props) {
   const [photosPublic, setPhotosPublic] = useState(initialValues?.photosPublic ?? false);
   const [saving, setSaving] = useState(false);
 
-  const [placeResults, setPlaceResults] = useState<PlaceResult[]>([]);
-  const [searchingPlaces, setSearchingPlaces] = useState(false);
-  const suppressNextSearch = useRef(false);
-
-  // Debounced place search as the user types — suppressed for one keystroke
-  // right after picking a suggestion, so selecting a result doesn't
-  // immediately re-search for its own name and reopen the dropdown.
-  useEffect(() => {
-    if (suppressNextSearch.current) {
-      suppressNextSearch.current = false;
-      setPlaceResults([]);
-      return;
-    }
-    if (locationName.trim().length < 3) {
-      setPlaceResults([]);
-      return;
-    }
-    const handle = setTimeout(async () => {
-      setSearchingPlaces(true);
-      try {
-        const results = await searchPlaces(locationName);
-        setPlaceResults(results);
-      } catch {
-        // Silent — place search is a convenience on top of typing/using
-        // current location, not something that should block the form.
-        setPlaceResults([]);
-      } finally {
-        setSearchingPlaces(false);
-      }
-    }, 400);
-    return () => clearTimeout(handle);
-  }, [locationName]);
-
-  const handleSelectPlace = (place: PlaceResult) => {
-    suppressNextSearch.current = true;
-    setLocationName(place.name);
-    setCoords({ lat: place.latitude, lng: place.longitude });
-    setPlaceResults([]);
-  };
-
-  const applyCoordsAndReverseGeocode = async (lat: number, lng: number) => {
-    setCoords({ lat, lng });
-    try {
-      const [place] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-      if (place) {
-        const parts = [place.name, place.street, place.city].filter(Boolean);
-        const guess = parts.slice(0, 2).join(', ');
-        if (guess) {
-          suppressNextSearch.current = true;
-          setLocationName(guess);
-        }
-      }
-    } catch {
-      // Reverse geocoding is a convenience, not a requirement — if it fails
-      // (offline, no result, etc.) the user can still type the location by
-      // hand, so this is deliberately silent.
-    }
-  };
-
-  const handleUseCurrentLocation = async () => {
-    setGettingLocation(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Location access needed', 'Turn on location access in Settings to set where this game is.');
-        return;
-      }
-      const position = await Location.getCurrentPositionAsync({});
-      await applyCoordsAndReverseGeocode(position.coords.latitude, position.coords.longitude);
-    } catch (e) {
-      Alert.alert('Could not get location', errorMessage(e));
-    } finally {
-      setGettingLocation(false);
-    }
-  };
-
-  const handleMapMove = (next: { latitude: number; longitude: number }) => {
-    applyCoordsAndReverseGeocode(next.latitude, next.longitude);
-  };
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
 
   const handleSubmit = async () => {
     const trimmedTitle = title.trim();
@@ -182,7 +103,7 @@ export function OpenGameForm({ mode, initialValues, onSubmit }: Props) {
     setSaving(true);
     try {
       await onSubmit({
-        sport,
+        sport: sport as SportTag,
         title: trimmedTitle,
         description: description.trim(),
         skillLevel,
@@ -195,7 +116,15 @@ export function OpenGameForm({ mode, initialValues, onSubmit }: Props) {
         photosPublic,
       });
     } catch (e) {
-      Alert.alert(mode === 'create' ? 'Could not post game' : 'Could not save changes', errorMessage(e));
+      const raw = errorMessage(e);
+      // The RLS policy that gates posting a game (verified account, 3+ days
+      // old) fails with raw Postgres "row-level security policy" text, which
+      // reads as a broken app rather than an explainable rule — translate it
+      // to the actual requirement instead.
+      const friendly = /row-level security policy/i.test(raw)
+        ? "You need a verified account that's at least 3 days old to post a game. Verify your account in Settings if you haven't yet."
+        : raw;
+      Alert.alert(mode === 'create' ? 'Could not post game' : 'Could not save changes', friendly);
     } finally {
       setSaving(false);
     }
@@ -220,21 +149,7 @@ export function OpenGameForm({ mode, initialValues, onSubmit }: Props) {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Section title="Sport" styles={styles}>
-            <View style={styles.pillRow}>
-              {SPORTS.slice(0, 12).map((s) => {
-                const selected = s.value === sport;
-                return (
-                  <AnimatedPressable
-                    key={s.value}
-                    style={[styles.pill, selected && styles.pillSelected]}
-                    onPress={() => setSport(s.value)}>
-                    <Text style={[styles.pillText, selected && styles.pillTextSelected]}>
-                      {s.emoji} {s.label}
-                    </Text>
-                  </AnimatedPressable>
-                );
-              })}
-            </View>
+            <SportPickerField value={sport} onChange={setSport} />
           </Section>
 
           <Section title="Title" styles={styles}>
@@ -311,48 +226,33 @@ export function OpenGameForm({ mode, initialValues, onSubmit }: Props) {
           </Section>
 
           <Section title="Location" styles={styles}>
-            <View>
-              <TextInput
-                style={styles.input}
-                placeholder="Try a place name, like Adler Planetarium"
-                placeholderTextColor={colors.textSecondary}
-                value={locationName}
-                onChangeText={setLocationName}
-              />
-              {searchingPlaces ? (
-                <ActivityIndicator style={styles.searchSpinner} color={colors.textSecondary} size="small" />
-              ) : null}
-              {placeResults.length > 0 ? (
-                <View style={styles.placeDropdown}>
-                  {placeResults.map((place, i) => (
-                    <AnimatedPressable
-                      key={`${place.latitude}-${place.longitude}`}
-                      style={[styles.placeRow, i === placeResults.length - 1 && styles.placeRowLast]}
-                      onPress={() => handleSelectPlace(place)}>
-                      <Text style={styles.placeRowText} numberOfLines={2}>
-                        {place.name}
-                      </Text>
-                    </AnimatedPressable>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-            <AnimatedPressable
-              style={styles.locationButton}
-              onPress={handleUseCurrentLocation}
-              disabled={gettingLocation}>
-              {gettingLocation ? (
-                <ActivityIndicator color={colors.text} size="small" />
-              ) : (
-                <Text style={styles.locationButtonText}>Use my current location</Text>
-              )}
-            </AnimatedPressable>
             {coords ? (
-              <View style={styles.mapWrap}>
-                <GameMap latitude={coords.lat} longitude={coords.lng} interactive onLocationChange={handleMapMove} />
-                <Text style={styles.mapHint}>Tap or drag the pin to fine-tune the exact spot.</Text>
-              </View>
-            ) : null}
+              <AnimatedPressable style={styles.mapPreviewWrap} onPress={() => setMapPickerOpen(true)}>
+                <GameMap latitude={coords.lat} longitude={coords.lng} height={140} />
+                <View style={styles.mapPreviewFooter}>
+                  <Text style={styles.mapPreviewText} numberOfLines={1}>
+                    {locationName || 'Dropped pin'}
+                  </Text>
+                  <Text style={styles.mapPreviewChange}>Change</Text>
+                </View>
+              </AnimatedPressable>
+            ) : (
+              <AnimatedPressable style={styles.mapPickerTrigger} onPress={() => setMapPickerOpen(true)}>
+                <Text style={styles.mapPickerTriggerText}>Choose location on map</Text>
+              </AnimatedPressable>
+            )}
+
+            <MapPickerModal
+              visible={mapPickerOpen}
+              initialCoords={coords}
+              initialLocationName={locationName}
+              onClose={() => setMapPickerOpen(false)}
+              onConfirm={(nextCoords, nextName) => {
+                setCoords(nextCoords);
+                setLocationName(nextName);
+                setMapPickerOpen(false);
+              }}
+            />
           </Section>
 
           <Section title="Max spots (optional)" styles={styles}>
@@ -483,35 +383,30 @@ function makeStyles(colors: ThemeColors) {
     pillSelected: { backgroundColor: colors.coral, borderColor: colors.coral },
     pillText: { fontSize: 13, fontWeight: WEIGHT.semibold, color: colors.text },
     pillTextSelected: { color: ON_ACCENT },
-    locationButton: {
-      alignSelf: 'flex-start',
-      marginTop: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: RADII.pill,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-    },
-    locationButtonText: { fontSize: 13, fontWeight: WEIGHT.semibold, color: colors.text },
-    searchSpinner: { position: 'absolute', right: 14, top: 14 },
-    placeDropdown: {
+    mapPickerTrigger: {
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: RADII.md,
-      marginTop: 6,
-      backgroundColor: colors.background,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    mapPickerTriggerText: { fontSize: 14, fontWeight: WEIGHT.semibold, color: colors.text },
+    mapPreviewWrap: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: RADII.lg,
       overflow: 'hidden',
     },
-    placeRow: {
-      paddingHorizontal: 14,
-      paddingVertical: 11,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderSoft,
+    mapPreviewFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
     },
-    placeRowLast: { borderBottomWidth: 0 },
-    placeRowText: { fontSize: 13, color: colors.text },
-    mapWrap: { marginTop: 12, gap: 6 },
-    mapHint: { fontSize: 12, color: colors.textSecondary },
+    mapPreviewText: { flex: 1, fontSize: 13, color: colors.text },
+    mapPreviewChange: { fontSize: 12, fontWeight: WEIGHT.bold, color: colors.coral },
     androidDateRow: { flexDirection: 'row', gap: 8 },
     androidDateButton: {
       flexDirection: 'row',

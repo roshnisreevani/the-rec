@@ -50,6 +50,12 @@ function RootNavigator() {
             <Stack.Screen name="open-game/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="edit-open-game/[id]" options={{ headerShown: false, presentation: 'modal' }} />
             <Stack.Screen name="create-highlight" options={{ headerShown: false, presentation: 'modal' }} />
+            {/* Plain stack push (not fullScreenModal) — fullScreenModal was
+                rendering this screen's header up under the iOS status bar,
+                making "Use clip" untappable. A regular push inherits safe
+                area insets the same reliable way every other screen here
+                does. */}
+            <Stack.Screen name="trim-highlight" options={{ headerShown: false }} />
             <Stack.Screen name="highlight/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="find-people" options={{ headerShown: false }} />
             <Stack.Screen name="user/[id]" options={{ headerShown: false }} />
